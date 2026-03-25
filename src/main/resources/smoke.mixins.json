@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "package": "com.smoke.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [],
+  "client": [
+    "accessor.EntityS2CPacketAccessor",
+    "accessor.InputAccessor",
+    "accessor.LivingEntityAccessor",
+    "accessor.MinecraftClientAccessor",
+    "accessor.SimpleOptionAccessor",
+    "MixinYggdrasilSessionService",
+    "network.ClientConnectionMixin",
+    "player.ClientPlayerInteractionManagerAttackBlockMixin",
+    "player.ClientPlayerInteractionManagerAttackEntityMixin",
+    "player.KeyboardInputMixin",
+    "player.MinecraftClientHandleInputMixin",
+    "render.EntityMixin",
+    "render.EntityRendererMixin",
+    "render.MinecraftClientMixin",
+    "screen.TitleScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

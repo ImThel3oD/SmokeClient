@@ -1,0 +1,18 @@
+## Gradle
+.gradle/
+build/
+out/
+run/
+net/
+
+## IntelliJ
+.idea/
+*.iml
+
+## Local scratch
+.tmp-*/
+.minimax/
+
+## OS
+Thumbs.db
+.DS_Store

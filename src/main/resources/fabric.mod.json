@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "smoke",
+  "version": "${version}",
+  "name": "Smoke",
+  "description": "Minimal Fabric client base for Minecraft 1.21.8",
+  "authors": [
+    "kirtc"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.smoke.client.SmokeClient"
+    ]
+  },
+  "mixins": [
+    "smoke.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.13",
+    "minecraft": "~1.21.8",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
