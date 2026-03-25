@@ -19,6 +19,7 @@ import com.smoke.client.feature.module.render.RenderModules;
 import com.smoke.client.feature.module.world.WorldModules;
 import com.smoke.client.input.BlocksModuleKeybindsScreen;
 import com.smoke.client.input.InputService;
+import com.smoke.client.module.ModuleConflictService;
 import com.smoke.client.module.ModuleContext;
 import com.smoke.client.module.ModuleManager;
 import com.smoke.client.network.PacketService;
@@ -53,6 +54,7 @@ public final class ClientRuntime {
     private final HudService hudService = new HudService();
     private final Theme theme = Theme.defaultTheme();
     private final ModuleTraceService moduleTraceService = new ModuleTraceService(this);
+    private final ModuleConflictService moduleConflictService = new ModuleConflictService(this);
     private final ModuleContext moduleContext = new ModuleContext(this);
 
     private int autosaveTicks;
@@ -62,6 +64,7 @@ public final class ClientRuntime {
         registerCommands();
         eventBus.register(rotationService);
         eventBus.register(moduleTraceService);
+        eventBus.register(moduleConflictService);
 
         configService.load(moduleManager);
         hudService.registerDefaults(this);
@@ -231,6 +234,7 @@ public final class ClientRuntime {
         inputService.clear();
         eventBus.unregister(rotationService);
         eventBus.unregister(moduleTraceService);
+        eventBus.unregister(moduleConflictService);
         rotationService.clear();
         moduleTraceService.clearAll();
     }
