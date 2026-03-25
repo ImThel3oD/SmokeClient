@@ -30,6 +30,8 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
     private static final String UI_SECTION = "click_gui";
     private static final String FILTER_KEY = "selected_filter";
     private static final String FILTER_ALL = "all";
+    private static final float MODULE_SUFFIX_SCALE = 0.75F;
+    private static final int MODULE_SUFFIX_GAP = 6;
 
     private final ClientRuntime runtime;
 
@@ -52,6 +54,7 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
 
     @Override
     protected void init() {
+        super.init();
         layout = ClickGuiLayout.create(width, height);
         String query = searchField == null ? "" : searchField.getText();
         searchField = new TextFieldWidget(
@@ -75,6 +78,9 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
                 activeDrag = null;
             }
         });
+        addSelectableChild(searchField);
+        setInitialFocus(searchField);
+        searchField.setFocused(true);
     }
 
     @Override
@@ -128,6 +134,11 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (searchField != null && searchField.mouseClicked(mouseX, mouseY, button)) {
+            searchField.setFocused(true);
+            return true;
+        }
+        if (button == 0 && layout != null && layout.search().contains(mouseX, mouseY) && searchField != null) {
+            searchField.setFocused(true);
             return true;
         }
         if (button == 0 && handleCategoryClick(mouseX, mouseY)) {
@@ -296,22 +307,14 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
             if (module.enabled()) {
                 drawContext.fill(rowRect.x(), rowRect.y(), rowRect.x() + 2, rowRect.bottom(), ClickGuiPalette.ACCENT);
             }
-            drawContext.drawText(
-                    textRenderer,
-                    module.name(),
-                    rowRect.x() + 10,
-                    rowRect.y() + 10,
-                    module.enabled() ? ClickGuiPalette.TEXT_PRIMARY : ClickGuiPalette.TEXT_SECONDARY,
-                    false
-            );
-
             ClickGuiLayout.Rect toggleRect = toggleRect(rowRect);
+            int labelEnd = renderModuleLabel(drawContext, module, rowRect, toggleRect.x() - 10);
             renderToggle(drawContext, toggleRect, module.enabled());
             if (showAllCategories || isSearchActive()) {
                 String category = module.category().displayName();
                 int categoryWidth = textRenderer.getWidth(category);
                 int categoryX = toggleRect.x() - 10 - categoryWidth;
-                if (categoryX > rowRect.x() + 60) {
+                if (categoryX > labelEnd + 10) {
                     drawContext.drawText(textRenderer, category, categoryX, rowRect.y() + 10, ClickGuiPalette.TEXT_MUTED, false);
                 }
             }
@@ -335,6 +338,48 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         }
     }
 
+    private int renderModuleLabel(DrawContext drawContext, Module module, ClickGuiLayout.Rect rowRect, int maxRight) {
+        int nameX = rowRect.x() + 10;
+        int nameY = rowRect.y() + 10;
+        int nameColor = module.enabled() ? ClickGuiPalette.TEXT_PRIMARY : ClickGuiPalette.TEXT_SECONDARY;
+        String name = module.name();
+        drawContext.drawText(textRenderer, name, nameX, nameY, nameColor, false);
+
+        int labelEnd = nameX + textRenderer.getWidth(name);
+        String suffix = module.displaySuffix();
+        if (suffix == null || suffix.isBlank()) {
+            return labelEnd;
+        }
+
+        int suffixX = labelEnd + MODULE_SUFFIX_GAP;
+        int suffixWidth = scaledTextWidth(suffix, MODULE_SUFFIX_SCALE);
+        if (suffixX + suffixWidth > maxRight) {
+            return labelEnd;
+        }
+
+        renderScaledText(
+                drawContext,
+                suffix,
+                suffixX,
+                rowRect.y() + 11,
+                module.enabled() ? ClickGuiPalette.TEXT_MUTED : ClickGuiPalette.TEXT_DISABLED,
+                MODULE_SUFFIX_SCALE
+        );
+        return suffixX + suffixWidth;
+    }
+
+    private int scaledTextWidth(String text, float scale) {
+        return Math.round(textRenderer.getWidth(text) * scale);
+    }
+
+    private void renderScaledText(DrawContext drawContext, String text, int x, int y, int color, float scale) {
+        drawContext.getMatrices().pushMatrix();
+        drawContext.getMatrices().translate(x, y);
+        drawContext.getMatrices().scale(scale, scale);
+        drawContext.drawText(textRenderer, text, 0, 0, color, false);
+        drawContext.getMatrices().popMatrix();
+    }
+
     private int measureModuleListHeight(List<Module> modules, int width) {
         int total = 6;
         for (Module module : modules) {
@@ -351,13 +396,8 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         total += wrapLines(module.description(), Math.max(40, width - 20)).size() * (textRenderer.fontHeight + 2);
         String suffix = module.displaySuffix();
         total += suffix == null || suffix.isBlank() ? 6 : textRenderer.fontHeight + 8;
-        for (Setting<?> setting : visibleSettings(module)) {
-            total += switch (setting) {
-                case NumberSetting ignored -> ClickGuiPalette.NUMBER_ROW_HEIGHT;
-                case ColorSetting colorSetting -> ClickGuiPalette.SETTING_ROW_HEIGHT
-                        + (settingPath(module, colorSetting).equals(openColorSettingPath) ? 6 + (ClickGuiPalette.COLOR_CHANNEL_HEIGHT * 4) + 12 : 0);
-                default -> ClickGuiPalette.SETTING_ROW_HEIGHT;
-            };
+        for (SettingRow row : visibleSettingRows(module)) {
+            total += measureSettingHeight(module, row);
             total += 6;
         }
         return total + 4;
@@ -448,19 +488,24 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
             cursorY += 6;
         }
 
-        for (Setting<?> setting : visibleSettings(module)) {
-            if (setting instanceof BoolSetting boolSetting) {
-                renderBoolSetting(drawContext, boolSetting, contentX, cursorY, contentWidth);
-            } else if (setting instanceof NumberSetting numberSetting) {
-                renderNumberSetting(drawContext, numberSetting, contentX, cursorY, contentWidth);
-            } else if (setting instanceof EnumSetting<?> enumSetting) {
-                renderEnumSetting(drawContext, enumSetting, contentX, cursorY, contentWidth);
-            } else if (setting instanceof ColorSetting colorSetting) {
-                renderColorSetting(drawContext, module, colorSetting, contentX, cursorY, contentWidth);
-            } else if (setting instanceof KeyBindSetting keyBindSetting) {
-                renderKeybindSetting(drawContext, module, keyBindSetting, contentX, cursorY, contentWidth);
+        for (SettingRow row : visibleSettingRows(module)) {
+            if (row instanceof NumberRangeRow rangeRow) {
+                renderNumberRangeSetting(drawContext, rangeRow, contentX, cursorY, contentWidth);
+            } else if (row instanceof SingleSettingRow singleRow) {
+                Setting<?> setting = singleRow.setting();
+                if (setting instanceof BoolSetting boolSetting) {
+                    renderBoolSetting(drawContext, boolSetting, contentX, cursorY, contentWidth);
+                } else if (setting instanceof NumberSetting numberSetting) {
+                    renderNumberSetting(drawContext, numberSetting, contentX, cursorY, contentWidth);
+                } else if (setting instanceof EnumSetting<?> enumSetting) {
+                    renderEnumSetting(drawContext, enumSetting, contentX, cursorY, contentWidth);
+                } else if (setting instanceof ColorSetting colorSetting) {
+                    renderColorSetting(drawContext, module, colorSetting, contentX, cursorY, contentWidth);
+                } else if (setting instanceof KeyBindSetting keyBindSetting) {
+                    renderKeybindSetting(drawContext, module, keyBindSetting, contentX, cursorY, contentWidth);
+                }
             }
-            cursorY += measureSettingHeight(module, setting) + 6;
+            cursorY += measureSettingHeight(module, row) + 6;
         }
         return bodyRect.bottom();
     }
@@ -472,6 +517,13 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
                     + (settingPath(module, colorSetting).equals(openColorSettingPath) ? 6 + (ClickGuiPalette.COLOR_CHANNEL_HEIGHT * 4) + 12 : 0);
             default -> ClickGuiPalette.SETTING_ROW_HEIGHT;
         };
+    }
+
+    private int measureSettingHeight(Module module, SettingRow row) {
+        if (row instanceof NumberRangeRow) {
+            return ClickGuiPalette.NUMBER_ROW_HEIGHT;
+        }
+        return measureSettingHeight(module, ((SingleSettingRow) row).setting());
     }
 
     private void renderBoolSetting(DrawContext drawContext, BoolSetting setting, int x, int y, int width) {
@@ -486,6 +538,14 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         drawContext.drawText(textRenderer, setting.label(), rowRect.x(), rowRect.y(), ClickGuiPalette.TEXT_PRIMARY, false);
         drawContext.drawText(textRenderer, value, rowRect.right() - textRenderer.getWidth(value), rowRect.y(), ClickGuiPalette.TEXT_SECONDARY, false);
         renderSlider(drawContext, sliderRect(rowRect), normalized(setting), ClickGuiPalette.TRACK_FILL);
+    }
+
+    private void renderNumberRangeSetting(DrawContext drawContext, NumberRangeRow row, int x, int y, int width) {
+        ClickGuiLayout.Rect rowRect = new ClickGuiLayout.Rect(x, y, width, ClickGuiPalette.NUMBER_ROW_HEIGHT);
+        String value = row.minSetting().displayValue() + " - " + row.maxSetting().displayValue();
+        drawContext.drawText(textRenderer, row.label(), rowRect.x(), rowRect.y(), ClickGuiPalette.TEXT_PRIMARY, false);
+        drawContext.drawText(textRenderer, value, rowRect.right() - textRenderer.getWidth(value), rowRect.y(), ClickGuiPalette.TEXT_SECONDARY, false);
+        renderRangeSlider(drawContext, sliderRect(rowRect), normalized(row.minSetting()), normalized(row.maxSetting()), ClickGuiPalette.TRACK_FILL);
     }
 
     private void renderEnumSetting(DrawContext drawContext, EnumSetting<?> setting, int x, int y, int width) {
@@ -643,53 +703,63 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         String suffix = module.displaySuffix();
         cursorY += suffix == null || suffix.isBlank() ? 6 : textRenderer.fontHeight + 8;
 
-        for (Setting<?> setting : visibleSettings(module)) {
-            ClickGuiLayout.Rect rowRect = new ClickGuiLayout.Rect(x + 10, cursorY, width - 20, measureSettingHeight(module, setting));
-            if (setting instanceof BoolSetting boolSetting) {
-                if (toggleRect(rowRect).contains(mouseX, mouseY)) {
-                    boolSetting.toggle();
-                    return true;
-                }
-            } else if (setting instanceof NumberSetting numberSetting) {
+        for (SettingRow row : visibleSettingRows(module)) {
+            ClickGuiLayout.Rect rowRect = new ClickGuiLayout.Rect(x + 10, cursorY, width - 20, measureSettingHeight(module, row));
+            if (row instanceof NumberRangeRow rangeRow) {
                 ClickGuiLayout.Rect sliderRect = sliderRect(rowRect);
                 if (sliderRect.contains(mouseX, mouseY)) {
-                    activeDrag = new NumberDrag(sliderRect, numberSetting);
+                    activeDrag = new NumberRangeDrag(sliderRect, rangeRow.minSetting(), rangeRow.maxSetting(), closestHandle(sliderRect, rangeRow, mouseX));
                     activeDrag.update(mouseX);
                     return true;
                 }
-            } else if (setting instanceof EnumSetting<?> enumSetting) {
-                ClickGuiLayout.Rect actionRect = actionRect(rowRect);
-                if (actionRect.contains(mouseX, mouseY)) {
-                    enumSetting.cycle(mouseX >= actionRect.x() + (actionRect.width() / 2.0D));
-                    return true;
-                }
-            } else if (setting instanceof ColorSetting colorSetting) {
-                ClickGuiLayout.Rect actionRect = actionRect(new ClickGuiLayout.Rect(rowRect.x(), rowRect.y(), rowRect.width(), ClickGuiPalette.SETTING_ROW_HEIGHT));
-                if (actionRect.contains(mouseX, mouseY)) {
-                    String path = settingPath(module, colorSetting);
-                    openColorSettingPath = path.equals(openColorSettingPath) ? null : path;
-                    activeDrag = null;
-                    return true;
-                }
-                if (settingPath(module, colorSetting).equals(openColorSettingPath)) {
-                    for (int index = 0; index < 4; index++) {
-                        ColorChannel channel = ColorChannel.values()[index];
-                        ClickGuiLayout.Rect sliderRect = colorSliderRect(new ClickGuiLayout.Rect(rowRect.x(), rowRect.y() + 30 + (index * 30), rowRect.width(), ClickGuiPalette.COLOR_CHANNEL_HEIGHT));
-                        if (sliderRect.contains(mouseX, mouseY)) {
-                            activeDrag = new ColorDrag(sliderRect, colorSetting, channel);
-                            activeDrag.update(mouseX);
-                            return true;
+            } else if (row instanceof SingleSettingRow singleRow) {
+                Setting<?> setting = singleRow.setting();
+                if (setting instanceof BoolSetting boolSetting) {
+                    if (toggleRect(rowRect).contains(mouseX, mouseY)) {
+                        boolSetting.toggle();
+                        return true;
+                    }
+                } else if (setting instanceof NumberSetting numberSetting) {
+                    ClickGuiLayout.Rect sliderRect = sliderRect(rowRect);
+                    if (sliderRect.contains(mouseX, mouseY)) {
+                        activeDrag = new NumberDrag(sliderRect, numberSetting);
+                        activeDrag.update(mouseX);
+                        return true;
+                    }
+                } else if (setting instanceof EnumSetting<?> enumSetting) {
+                    ClickGuiLayout.Rect actionRect = actionRect(rowRect);
+                    if (actionRect.contains(mouseX, mouseY)) {
+                        enumSetting.cycle(mouseX >= actionRect.x() + (actionRect.width() / 2.0D));
+                        return true;
+                    }
+                } else if (setting instanceof ColorSetting colorSetting) {
+                    ClickGuiLayout.Rect actionRect = actionRect(new ClickGuiLayout.Rect(rowRect.x(), rowRect.y(), rowRect.width(), ClickGuiPalette.SETTING_ROW_HEIGHT));
+                    if (actionRect.contains(mouseX, mouseY)) {
+                        String path = settingPath(module, colorSetting);
+                        openColorSettingPath = path.equals(openColorSettingPath) ? null : path;
+                        activeDrag = null;
+                        return true;
+                    }
+                    if (settingPath(module, colorSetting).equals(openColorSettingPath)) {
+                        for (int index = 0; index < 4; index++) {
+                            ColorChannel channel = ColorChannel.values()[index];
+                            ClickGuiLayout.Rect sliderRect = colorSliderRect(new ClickGuiLayout.Rect(rowRect.x(), rowRect.y() + 30 + (index * 30), rowRect.width(), ClickGuiPalette.COLOR_CHANNEL_HEIGHT));
+                            if (sliderRect.contains(mouseX, mouseY)) {
+                                activeDrag = new ColorDrag(sliderRect, colorSetting, channel);
+                                activeDrag.update(mouseX);
+                                return true;
+                            }
                         }
                     }
-                }
-            } else if (setting instanceof KeyBindSetting) {
-                if (actionRect(rowRect).contains(mouseX, mouseY)) {
-                    String path = settingPath(module, setting);
-                    pendingKeybindPath = path.equals(pendingKeybindPath) ? null : path;
-                    return true;
+                } else if (setting instanceof KeyBindSetting) {
+                    if (actionRect(rowRect).contains(mouseX, mouseY)) {
+                        String path = settingPath(module, setting);
+                        pendingKeybindPath = path.equals(pendingKeybindPath) ? null : path;
+                        return true;
+                    }
                 }
             }
-            cursorY += measureSettingHeight(module, setting) + 6;
+            cursorY += measureSettingHeight(module, row) + 6;
         }
         return false;
     }
@@ -718,8 +788,34 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         drawContext.fill(rect.x(), rect.y(), rect.right(), rect.bottom(), ClickGuiPalette.TRACK);
         int fillWidth = (int) Math.round(rect.width() * MathHelper.clamp((float) normalized, 0.0F, 1.0F));
         drawContext.fill(rect.x(), rect.y(), rect.x() + fillWidth, rect.bottom(), fillColor);
-        int knobX = MathHelper.clamp(rect.x() + fillWidth - 3, rect.x(), rect.right() - 6);
+        renderSliderHandle(drawContext, rect, rect.x() + fillWidth);
+    }
+
+    private void renderRangeSlider(DrawContext drawContext, ClickGuiLayout.Rect rect, double lowerNormalized, double upperNormalized, int fillColor) {
+        drawContext.fill(rect.x(), rect.y(), rect.right(), rect.bottom(), ClickGuiPalette.TRACK);
+        int lowerX = sliderPosition(rect, lowerNormalized);
+        int upperX = sliderPosition(rect, upperNormalized);
+        if (lowerX > upperX) {
+            int swap = lowerX;
+            lowerX = upperX;
+            upperX = swap;
+        }
+        drawContext.fill(lowerX, rect.y(), Math.max(lowerX + 1, upperX), rect.bottom(), fillColor);
+        renderSliderHandle(drawContext, rect, lowerX);
+        renderSliderHandle(drawContext, rect, upperX);
+    }
+
+    private void renderSliderHandle(DrawContext drawContext, ClickGuiLayout.Rect rect, int centerX) {
+        int knobX = MathHelper.clamp(centerX - 3, rect.x(), rect.right() - 6);
         drawContext.fill(knobX, rect.y() - 1, knobX + 6, rect.bottom() + 1, ClickGuiPalette.SWITCH_KNOB);
+    }
+
+    private int sliderPosition(ClickGuiLayout.Rect rect, double normalized) {
+        return MathHelper.clamp(
+                rect.x() + (int) Math.round(rect.width() * MathHelper.clamp((float) normalized, 0.0F, 1.0F)),
+                rect.x(),
+                rect.right()
+        );
     }
 
     private List<String> wrapLines(String text, int maxWidth) {
@@ -764,8 +860,84 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         return range <= 0.0D ? 0.0D : (setting.value() - setting.min()) / range;
     }
 
+    private List<SettingRow> visibleSettingRows(Module module) {
+        List<Setting<?>> settings = visibleSettings(module);
+        List<SettingRow> rows = new ArrayList<>(settings.size());
+        for (int index = 0; index < settings.size(); index++) {
+            Setting<?> setting = settings.get(index);
+            if (setting instanceof NumberSetting minSetting
+                    && index + 1 < settings.size()
+                    && settings.get(index + 1) instanceof NumberSetting maxSetting
+                    && isRangePair(minSetting, maxSetting)) {
+                rows.add(new NumberRangeRow(minSetting, maxSetting, rangeLabel(minSetting, maxSetting)));
+                index++;
+                continue;
+            }
+            rows.add(new SingleSettingRow(setting));
+        }
+        return rows;
+    }
+
+    private static boolean isRangePair(NumberSetting minSetting, NumberSetting maxSetting) {
+        String minSuffix = rangeSuffix(minSetting.id(), "min_");
+        return minSuffix != null
+                && minSuffix.equals(rangeSuffix(maxSetting.id(), "max_"))
+                && Double.compare(minSetting.min(), maxSetting.min()) == 0
+                && Double.compare(minSetting.max(), maxSetting.max()) == 0
+                && Double.compare(minSetting.step(), maxSetting.step()) == 0;
+    }
+
+    private static String rangeSuffix(String id, String prefix) {
+        return id.startsWith(prefix) && id.length() > prefix.length() ? id.substring(prefix.length()) : null;
+    }
+
+    private static String rangeLabel(NumberSetting minSetting, NumberSetting maxSetting) {
+        String minLabel = stripRangeQualifier(minSetting.label());
+        String maxLabel = stripRangeQualifier(maxSetting.label());
+        if (!minLabel.isBlank() && minLabel.equalsIgnoreCase(maxLabel)) {
+            return minLabel;
+        }
+        String suffix = rangeSuffix(minSetting.id(), "min_");
+        return suffix == null ? minSetting.label() + " / " + maxSetting.label() : humanizeSettingId(suffix);
+    }
+
+    private static String stripRangeQualifier(String label) {
+        return label.replaceAll("(?i)\\b(?:min|max)\\b", "").replaceAll("\\s{2,}", " ").trim();
+    }
+
+    private static String humanizeSettingId(String id) {
+        StringBuilder label = new StringBuilder();
+        for (String part : id.split("_")) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (!label.isEmpty()) {
+                label.append(' ');
+            }
+            label.append(part.length() <= 3
+                    ? part.toUpperCase(Locale.ROOT)
+                    : Character.toUpperCase(part.charAt(0)) + part.substring(1));
+        }
+        return label.isEmpty() ? id : label.toString();
+    }
+
+    private RangeHandle closestHandle(ClickGuiLayout.Rect rect, NumberRangeRow row, double mouseX) {
+        int minX = sliderPosition(rect, normalized(row.minSetting()));
+        int maxX = sliderPosition(rect, normalized(row.maxSetting()));
+        return Math.abs(mouseX - minX) <= Math.abs(mouseX - maxX) ? RangeHandle.MIN : RangeHandle.MAX;
+    }
+
     private interface DragTarget {
         void update(double mouseX);
+    }
+
+    private sealed interface SettingRow permits SingleSettingRow, NumberRangeRow {
+    }
+
+    private record SingleSettingRow(Setting<?> setting) implements SettingRow {
+    }
+
+    private record NumberRangeRow(NumberSetting minSetting, NumberSetting maxSetting, String label) implements SettingRow {
     }
 
     private record NumberDrag(ClickGuiLayout.Rect rect, NumberSetting setting) implements DragTarget {
@@ -777,6 +949,19 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
         }
     }
 
+    private record NumberRangeDrag(ClickGuiLayout.Rect rect, NumberSetting minSetting, NumberSetting maxSetting, RangeHandle handle) implements DragTarget {
+        @Override
+        public void update(double mouseX) {
+            double normalized = (mouseX - rect.x()) / rect.width();
+            double value = minSetting.min() + ((minSetting.max() - minSetting.min()) * Math.max(0.0D, Math.min(1.0D, normalized)));
+            if (handle == RangeHandle.MIN) {
+                minSetting.setValue(Math.min(value, maxSetting.value()));
+            } else {
+                maxSetting.setValue(Math.max(value, minSetting.value()));
+            }
+        }
+    }
+
     private record ColorDrag(ClickGuiLayout.Rect rect, ColorSetting setting, ColorChannel channel) implements DragTarget {
         @Override
         public void update(double mouseX) {
@@ -784,6 +969,11 @@ public final class ClickGuiScreen extends Screen implements BlocksModuleKeybinds
             int value = MathHelper.clamp((int) Math.round(Math.max(0.0D, Math.min(1.0D, normalized)) * 255.0D), 0, 255);
             setting.setValue(channel.apply(setting.value(), value));
         }
+    }
+
+    private enum RangeHandle {
+        MIN,
+        MAX
     }
 
     private enum ColorChannel {

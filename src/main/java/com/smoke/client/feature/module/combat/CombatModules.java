@@ -10,6 +10,7 @@ public final class CombatModules {
     public static void register(ModuleManager moduleManager, ModuleContext moduleContext) {
         moduleManager.register(new AimAssistModule(moduleContext));
         moduleManager.register(new AntiBot(moduleContext));
+        moduleManager.register(new AutoClickerModule(moduleContext));
         moduleManager.register(new BacktrackModule(moduleContext));
         moduleManager.register(new CriticalsModule(moduleContext));
         moduleManager.register(new KillAuraModule(moduleContext));

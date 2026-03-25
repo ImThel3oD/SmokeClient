@@ -10,5 +10,6 @@ public final class MovementModules {
     public static void register(ModuleManager moduleManager, ModuleContext moduleContext) {
         moduleManager.register(new InvMoveModule(moduleContext));
         moduleManager.register(new SprintModule(moduleContext));
+        moduleManager.register(new SafeWalkModule(moduleContext));
     }
 }
