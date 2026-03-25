@@ -220,7 +220,7 @@ public final class ClientRuntime {
             if (client.currentScreen == null) {
                 openClickGui();
             } else if (client.currentScreen instanceof ClickGuiScreen) {
-                client.setScreen(null);
+                ((ClickGuiScreen) client.currentScreen).requestClose();
             }
         }
     }

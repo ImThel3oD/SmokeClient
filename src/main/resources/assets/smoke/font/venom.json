@@ -1,0 +1,15 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "smoke:comfortaa.ttf",
+      "shift": [0, -2],
+      "size": 10,
+      "oversample": 4
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}
