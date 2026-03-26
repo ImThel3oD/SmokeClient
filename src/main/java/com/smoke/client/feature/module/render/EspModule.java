@@ -5,6 +5,8 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.smoke.client.SmokeClient;
 import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.EntityOutlineColorEvent;
+import com.smoke.client.event.events.EntityOutlineStateEvent;
 import com.smoke.client.event.events.WorldRenderEvent;
 import com.smoke.client.feature.module.render.esp.EntityMaskVertexConsumerProvider;
 import com.smoke.client.module.Module;
@@ -52,8 +54,6 @@ import java.util.Optional;
 import java.util.Set;
 
 public final class EspModule extends Module {
-    private static EspModule instance;
-
     private static final Identifier MASK_TARGET = Identifier.of(SmokeClient.MOD_ID, "esp_mask");
     private static final Identifier EDGE_TARGET = Identifier.of(SmokeClient.MOD_ID, "esp_edges");
     private static final Identifier RAW_TARGET = Identifier.of(SmokeClient.MOD_ID, "esp_raw");
@@ -121,7 +121,6 @@ public final class EspModule extends Module {
 
     public EspModule(ModuleContext context) {
         super(context, "esp", "ESP", "Highlights players, mobs, and animals with boxes or clean silhouettes.", ModuleCategory.RENDER, GLFW.GLFW_KEY_UNKNOWN);
-        instance = this;
         outlineWidth.visibleWhen(() -> mode.value() != Mode.BOX);
         opacity.visibleWhen(() -> mode.value() == Mode.GLOW);
         throughWalls.visibleWhen(() -> mode.value() != Mode.OUTLINE);
@@ -165,6 +164,29 @@ public final class EspModule extends Module {
         }
 
         renderSilhouette(client, context);
+    }
+
+    @Subscribe
+    private void onEntityOutlineState(EntityOutlineStateEvent event) {
+        if (shouldRenderOutlineEntity(event.entity())) {
+            event.setOutlined(true);
+        }
+    }
+
+    @Subscribe
+    private void onEntityOutlineColor(EntityOutlineColorEvent event) {
+        Entity entity = event.entity();
+        if (!shouldRenderOutlineEntity(entity)) {
+            return;
+        }
+
+        Category category = categoryOf(entity);
+        if (category == null) {
+            return;
+        }
+
+        int outlineColor = mode.value() == Mode.GLOW ? glowColor(category) : color(category);
+        event.setOutlineColor(outlineColor & 0x00FFFFFF);
     }
 
     private void renderBoxes(MinecraftClient client, WorldRenderContext context) {
@@ -333,18 +355,9 @@ public final class EspModule extends Module {
         return entity.getType().getSpawnGroup() == SpawnGroup.MONSTER ? Category.MOBS : Category.ANIMALS;
     }
 
-    public static boolean isSupportedEntityTargetType(Entity entity) {
-        return categoryOf(entity) != null;
-    }
-
-    public static boolean shouldRenderOutline(Entity entity) {
-        EspModule esp = instance;
-        if (esp == null || !esp.enabled()) {
-            return false;
-        }
-
-        Mode mode = esp.mode.value();
-        if (mode != Mode.OUTLINE && mode != Mode.GLOW) {
+    private boolean shouldRenderOutlineEntity(Entity entity) {
+        Mode currentMode = mode.value();
+        if (currentMode != Mode.OUTLINE && currentMode != Mode.GLOW) {
             return false;
         }
 
@@ -354,26 +367,11 @@ public final class EspModule extends Module {
         }
 
         Category category = categoryOf(entity);
-        if (category == null || !esp.enabled(category) || entity.isRemoved() || !entity.isAlive()) {
+        if (category == null || !enabled(category) || entity.isRemoved() || !entity.isAlive()) {
             return false;
         }
 
         return client.player.squaredDistanceTo(entity) <= 256.0D * 256.0D;
-    }
-
-    public static int getEntityOutlineColor(Entity entity) {
-        EspModule esp = instance;
-        if (esp == null || !shouldRenderOutline(entity)) {
-            return -1;
-        }
-
-        Category category = categoryOf(entity);
-        if (category == null) {
-            return -1;
-        }
-
-        int color = esp.mode.value() == Mode.GLOW ? esp.glowColor(category) : esp.color(category);
-        return color & 0x00FFFFFF;
     }
 
     private boolean enabled(Category category) {

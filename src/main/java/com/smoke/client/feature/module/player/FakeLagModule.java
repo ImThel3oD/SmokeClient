@@ -2,9 +2,12 @@ package com.smoke.client.feature.module.player;
 
 import com.smoke.client.event.Subscribe;
 import com.smoke.client.event.events.TickEvent;
+import com.smoke.client.module.ClientSessionListener;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
+import com.smoke.client.network.ImmediatePacketSender;
+import com.smoke.client.network.OutboundPacketInterceptor;
 import com.smoke.client.setting.NumberSetting;
 import io.netty.channel.ChannelFutureListener;
 import net.minecraft.client.MinecraftClient;
@@ -16,19 +19,13 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-public final class FakeLagModule extends Module {
+public final class FakeLagModule extends Module implements OutboundPacketInterceptor, ClientSessionListener {
     private static final int MAX_BUFFERED_PACKETS = 1024;
-    private static volatile FakeLagModule instance;
     private final NumberSetting delay = addSetting(new NumberSetting("delay", "Delay", "Milliseconds added to outbound play packets.", 200.0D, 0.0D, 2000.0D, 1.0D));
     private final ConcurrentLinkedDeque<Entry> queue = new ConcurrentLinkedDeque<>();
 
     public FakeLagModule(ModuleContext context) {
         super(context, "fake_lag", "FakeLag", "Delays outbound play packets while preserving send order.", ModuleCategory.EXPLOIT, GLFW.GLFW_KEY_UNKNOWN);
-        instance = this;
-    }
-
-    public static boolean intercept(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) {
-        return instance != null && instance.queuePacket(connection, packet, listener, flush);
     }
 
     @Subscribe
@@ -51,15 +48,18 @@ public final class FakeLagModule extends Module {
         flushAll();
     }
 
-    public void onDisconnect() {
+    @Override
+    public void onClientDisconnect() {
         disableOutsidePlaySession();
     }
 
+    @Override
     public void onWorldChange() {
         disableOutsidePlaySession();
     }
 
-    private boolean queuePacket(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) {
+    @Override
+    public boolean interceptOutbound(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) {
         if (!enabled() || connection == null || packet == null || !connection.isOpen() || !isPlaySession(connection)) return false;
         long now = System.currentTimeMillis();
         queue.addLast(new Entry(connection, packet, listener, flush, now + delay.value().longValue()));
@@ -77,7 +77,7 @@ public final class FakeLagModule extends Module {
 
     private void sendQueued(@Nullable Entry entry) {
         if (entry == null || !entry.connection.isOpen() || !isPlaySession(entry.connection)) return;
-        ((Sender) entry.connection).smoke$sendImmediately(entry.packet, entry.listener, entry.flush);
+        ((ImmediatePacketSender) entry.connection).smoke$sendImmediately(entry.packet, entry.listener, entry.flush);
     }
 
     private boolean isPlaySessionActive() {
@@ -95,9 +95,5 @@ public final class FakeLagModule extends Module {
     }
 
     private record Entry(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush, long releaseAt) {
-    }
-
-    public interface Sender {
-        void smoke$sendImmediately(Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush);
     }
 }

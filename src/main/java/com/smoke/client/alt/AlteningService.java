@@ -2,6 +2,7 @@ package com.smoke.client.alt;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.smoke.client.SmokeClient;
 import com.smoke.client.mixin.accessor.MinecraftClientAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.session.Session;
@@ -38,7 +39,7 @@ public final class AlteningService {
         try {
             AlteningApiClient.installTlsFallbackAsGlobalDefault();
         } catch (Throwable t) {
-            System.err.println("[Smoke] Failed to install Altening TLS fallback: " + t.getMessage());
+            SmokeClient.LOGGER.warn("Failed to install Altening TLS fallback: {}", t.getMessage());
         }
     }
 
@@ -164,7 +165,7 @@ public final class AlteningService {
             AltData data = GSON.fromJson(reader, AltData.class);
             return data != null ? data : new AltData();
         } catch (Exception e) {
-            System.err.println("[Smoke] Failed to load alt data: " + e.getMessage());
+            SmokeClient.LOGGER.warn("Failed to load alt data: {}", e.getMessage());
             return new AltData();
         }
     }
@@ -179,7 +180,7 @@ public final class AlteningService {
         try (Writer writer = new FileWriter(file, StandardCharsets.UTF_8)) {
             GSON.toJson(data, writer);
         } catch (Exception e) {
-            System.err.println("[Smoke] Failed to save alt data: " + e.getMessage());
+            SmokeClient.LOGGER.warn("Failed to save alt data: {}", e.getMessage());
         }
     }
 

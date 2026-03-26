@@ -1,7 +1,6 @@
 package com.smoke.client.module;
 
 import com.smoke.client.setting.KeyBindSetting;
-import com.smoke.client.setting.NumberSetting;
 import com.smoke.client.setting.Setting;
 
 import java.util.ArrayList;
@@ -77,13 +76,6 @@ public abstract class Module {
     }
 
     public String displaySuffix() {
-        NumberSetting minCps = findSetting("min_cps", NumberSetting.class);
-        NumberSetting maxCps = findSetting("max_cps", NumberSetting.class);
-        if (minCps != null && maxCps != null) {
-            double min = minCps.value();
-            double max = Math.max(min, maxCps.value());
-            return "CPS " + formatNumber(min) + " - " + formatNumber(max);
-        }
         return null;
     }
 
@@ -109,7 +101,7 @@ public abstract class Module {
         onDisable();
     }
 
-    private <T extends Setting<?>> T findSetting(String settingId, Class<T> type) {
+    protected final <T extends Setting<?>> T findSetting(String settingId, Class<T> type) {
         for (Setting<?> setting : settings) {
             if (setting.id().equals(settingId) && type.isInstance(setting)) {
                 return type.cast(setting);
@@ -118,7 +110,7 @@ public abstract class Module {
         return null;
     }
 
-    private static String formatNumber(double value) {
+    protected static String formatNumber(double value) {
         return value == (long) value ? Long.toString((long) value) : String.format("%.2f", value);
     }
 

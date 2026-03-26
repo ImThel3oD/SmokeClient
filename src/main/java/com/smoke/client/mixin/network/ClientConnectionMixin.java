@@ -1,16 +1,14 @@
 package com.smoke.client.mixin.network;
 
 import com.smoke.client.SmokeClient;
-import com.smoke.client.feature.module.combat.KnockbackDelayModule;
-import com.smoke.client.feature.module.player.FakeLagModule;
+import com.smoke.client.network.ImmediatePacketSender;
+import com.smoke.client.network.OutboundPacketInterceptorService;
 import com.smoke.client.network.PacketService;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import net.minecraft.network.ClientConnection;
-import net.minecraft.network.NetworkSide;
 import net.minecraft.network.packet.Packet;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -18,10 +16,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientConnection.class)
-public abstract class ClientConnectionMixin implements FakeLagModule.Sender {
-    @Shadow
-    public abstract NetworkSide getSide();
-
+public abstract class ClientConnectionMixin implements ImmediatePacketSender {
     @Invoker("sendImmediately")
     public abstract void smoke$sendImmediately(Packet<?> packet, ChannelFutureListener listener, boolean flush);
 
@@ -95,8 +90,8 @@ public abstract class ClientConnectionMixin implements FakeLagModule.Sender {
             return;
         }
 
-        if (KnockbackDelayModule.intercept((ClientConnection) (Object) this, packet, callback, flush)
-                || FakeLagModule.intercept((ClientConnection) (Object) this, packet, callback, flush)) {
+        OutboundPacketInterceptorService interceptorService = SmokeClient.getRuntime().outboundPacketInterceptorService();
+        if (interceptorService.intercept((ClientConnection) (Object) this, packet, callback, flush)) {
             SmokeClient.getRuntime().packetService().clearPreparedOutbound();
             ci.cancel();
         }

@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.smoke.client.SmokeClient;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleManager;
 import com.smoke.client.setting.KeyBindSetting;
@@ -132,6 +133,7 @@ public final class ConfigService {
             JsonElement parsed = JsonParser.parseReader(reader);
             return parsed != null && parsed.isJsonObject() ? parsed.getAsJsonObject() : new JsonObject();
         } catch (Exception exception) {
+            SmokeClient.LOGGER.warn("Failed to read config file {}: {}", file, exception.getMessage());
             return new JsonObject();
         }
     }

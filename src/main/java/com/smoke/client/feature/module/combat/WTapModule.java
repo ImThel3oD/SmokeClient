@@ -1,6 +1,8 @@
 package com.smoke.client.feature.module.combat;
 
+import com.smoke.client.event.EventPriority;
 import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.AttackEntityPreEvent;
 import com.smoke.client.event.events.TickEvent;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
@@ -16,6 +18,11 @@ import org.lwjgl.glfw.GLFW;
 public final class WTapModule extends Module {
     private boolean released;
     public WTapModule(ModuleContext context) { super(context, "w_tap", "WTap", "Releases sprint for one tick after sprint hits.", ModuleCategory.COMBAT, GLFW.GLFW_KEY_UNKNOWN); }
+
+    @Subscribe(priority = EventPriority.HIGH)
+    private void onAttackEntityPre(AttackEntityPreEvent event) {
+        trigger(event.player(), event.target());
+    }
 
     public void trigger(PlayerEntity player, Entity target) {
         MinecraftClient client = MinecraftClient.getInstance();

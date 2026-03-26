@@ -1,7 +1,7 @@
 package com.smoke.client.mixin.player;
 
 import com.smoke.client.SmokeClient;
-import com.smoke.client.feature.module.movement.SafeWalkModule;
+import com.smoke.client.event.events.ClipAtLedgeEvent;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -15,7 +15,9 @@ public abstract class PlayerEntityMixin {
     @Inject(method = "clipAtLedge", at = @At("HEAD"), cancellable = true)
     private void smoke$clipAtLedge(CallbackInfoReturnable<Boolean> cir) {
         if ((Object) this != MinecraftClient.getInstance().player || SmokeClient.getRuntime() == null) return;
-        SafeWalkModule module = SmokeClient.getRuntime().moduleManager().getByType(SafeWalkModule.class).orElse(null);
-        if (module != null && module.shouldForceClip((ClientPlayerEntity) (Object) this)) cir.setReturnValue(true);
+        ClipAtLedgeEvent event = SmokeClient.getRuntime().eventBus().post(new ClipAtLedgeEvent((ClientPlayerEntity) (Object) this));
+        if (event.forceClip()) {
+            cir.setReturnValue(true);
+        }
     }
 }

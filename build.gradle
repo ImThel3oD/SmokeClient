@@ -15,11 +15,6 @@ repositories {
 }
 
 def customBuildDir = findProperty("smoke.buildDir") ?: System.getenv("SMOKE_BUILD_DIR")
-if ((customBuildDir == null || customBuildDir.toString().isBlank())
-        && System.getenv("LOCALAPPDATA") != null
-        && projectDir.absolutePath.contains("OneDrive")) {
-    customBuildDir = "${System.getenv("LOCALAPPDATA")}\\Smoke\\build"
-}
 if (customBuildDir != null && !customBuildDir.toString().isBlank()) {
     layout.buildDirectory.set(file(customBuildDir.toString()))
 }

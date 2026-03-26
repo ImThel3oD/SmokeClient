@@ -1,6 +1,7 @@
 package com.smoke.client.mixin.render;
 
-import com.smoke.client.feature.module.render.EspModule;
+import com.smoke.client.SmokeClient;
+import com.smoke.client.event.events.EntityOutlineColorEvent;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,16 +16,13 @@ public abstract class EntityMixin {
     private void smoke$getTeamColorValue(CallbackInfoReturnable<Integer> cir) {
         Entity self = (Entity) (Object) this;
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || self == client.player) {
-            return;
-        }
-        if (!EspModule.isSupportedEntityTargetType(self)) {
+        if (client.player == null || self == client.player || SmokeClient.getRuntime() == null) {
             return;
         }
 
-        int color = EspModule.getEntityOutlineColor(self);
-        if (color != -1) {
-            cir.setReturnValue(color);
+        EntityOutlineColorEvent event = SmokeClient.getRuntime().eventBus().post(new EntityOutlineColorEvent(self));
+        if (event.outlineColor() != -1) {
+            cir.setReturnValue(event.outlineColor());
         }
     }
 }
