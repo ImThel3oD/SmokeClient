@@ -15,6 +15,7 @@ public final class CombatModules {
         moduleManager.register(new CriticalsModule(moduleContext));
         moduleManager.register(new KillAuraModule(moduleContext));
         moduleManager.register(new KnockbackDelayModule(moduleContext));
+        moduleManager.register(new SilentAuraModule(moduleContext));
         moduleManager.register(new TriggerBotModule(moduleContext));
         moduleManager.register(new VelocityModule(moduleContext));
         moduleManager.register(new KeepSprintModule(moduleContext));

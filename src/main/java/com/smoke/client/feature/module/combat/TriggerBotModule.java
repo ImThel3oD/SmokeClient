@@ -33,6 +33,10 @@ public final class TriggerBotModule extends Module {
         super(context, "trigger_bot", "Trigger Bot", "Automatically clicks when your real crosshair is already on a valid target.", ModuleCategory.COMBAT, GLFW.GLFW_KEY_UNKNOWN);
     }
 
+    public Entity getTarget() {
+        return target;
+    }
+
     @Subscribe
     private void onTick(TickEvent event) {
         if (event.phase() != TickEvent.Phase.POST) return;
