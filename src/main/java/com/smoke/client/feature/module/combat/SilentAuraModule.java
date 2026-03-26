@@ -106,6 +106,7 @@ public final class SilentAuraModule extends Module {
             }
             break;
         }
+        while (mc.options.attackKey.wasPressed()) { /* drain extra presses */ }
     }
 
     @Subscribe
