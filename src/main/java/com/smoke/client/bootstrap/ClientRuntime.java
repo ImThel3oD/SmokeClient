@@ -13,6 +13,7 @@ import com.smoke.client.event.events.HudRenderEvent;
 import com.smoke.client.event.events.TickEvent;
 import com.smoke.client.event.events.WorldRenderEvent;
 import com.smoke.client.feature.module.combat.CombatModules;
+import com.smoke.client.feature.module.gui.GuiModules;
 import com.smoke.client.feature.module.movement.MovementModules;
 import com.smoke.client.feature.module.player.PlayerModules;
 import com.smoke.client.feature.module.render.RenderModules;
@@ -156,6 +157,7 @@ public final class ClientRuntime {
         CombatModules.register(moduleManager, moduleContext);
         MovementModules.register(moduleManager, moduleContext);
         RenderModules.register(moduleManager, moduleContext);
+        GuiModules.register(moduleManager, moduleContext);
         PlayerModules.register(moduleManager, moduleContext);
         WorldModules.register(moduleManager, moduleContext);
     }

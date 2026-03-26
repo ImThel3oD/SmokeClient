@@ -50,6 +50,10 @@ public final class KillAuraModule extends Module {
         super(ctx, "kill_aura", "Kill Aura", "Automatically attacks the best valid target within range and FOV.", ModuleCategory.COMBAT, GLFW.GLFW_KEY_UNKNOWN);
     }
 
+    public Entity getTarget() {
+        return plannedTarget;
+    }
+
     @Override
     protected void onDisable() {
         reset();
