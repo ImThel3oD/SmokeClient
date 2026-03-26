@@ -1,52 +1,49 @@
 package com.smoke.client.ui.click;
 
-import net.minecraft.util.math.MathHelper;
-
 record ClickGuiLayout(
         Rect window,
-        Rect sidebar,
-        Rect content,
+        Rect header,
+        Rect tabs,
         Rect search,
         Rect list,
-        int sidebarHeaderBottom,
-        int contentHeaderY
+        Rect footer
 ) {
     static ClickGuiLayout create(int screenWidth, int screenHeight) {
-        int margin = Math.max(6, Math.min(ClickGuiPalette.OUTER_MARGIN, Math.min(screenWidth, screenHeight) / 12));
-        int availableWidth = Math.max(220, screenWidth - (margin * 2));
-        int availableHeight = Math.max(140, screenHeight - (margin * 2));
-        int windowWidth = Math.min(520, availableWidth);
-        int windowHeight = Math.min(360, availableHeight);
+        int margin = Math.max(10, Math.min(ClickGuiPalette.OUTER_MARGIN, Math.min(screenWidth, screenHeight) / 10));
+        int availableWidth = Math.max(420, screenWidth - (margin * 2));
+        int availableHeight = Math.max(260, screenHeight - (margin * 2));
+        int windowWidth = Math.min(760, availableWidth);
+        int windowHeight = Math.min(454, availableHeight);
         int windowX = (screenWidth - windowWidth) / 2;
         int windowY = (screenHeight - windowHeight) / 2;
 
         Rect window = new Rect(windowX, windowY, windowWidth, windowHeight);
-        int sidebarWidth = MathHelper.clamp(windowWidth / 5, 72, 96);
-        Rect sidebar = new Rect(
-                windowX + ClickGuiPalette.INNER_PADDING,
-                windowY + ClickGuiPalette.INNER_PADDING,
-                sidebarWidth,
-                windowHeight - (ClickGuiPalette.INNER_PADDING * 2)
-        );
+        int innerX = windowX + ClickGuiPalette.INNER_PADDING;
+        int innerWidth = windowWidth - (ClickGuiPalette.INNER_PADDING * 2);
 
-        int contentX = sidebar.right() + ClickGuiPalette.CONTENT_GAP;
-        Rect content = new Rect(
-                contentX,
-                sidebar.y(),
-                window.right() - ClickGuiPalette.INNER_PADDING - contentX,
-                sidebar.height()
-        );
-
-        int searchY = content.y() + 18;
-        Rect search = new Rect(content.x(), searchY, content.width(), ClickGuiPalette.SEARCH_HEIGHT + 8);
+        Rect header = new Rect(innerX, windowY + 14, innerWidth, 22);
+        Rect tabs = new Rect(innerX, header.bottom() + 14, innerWidth, ClickGuiPalette.TAB_HEIGHT);
+        Rect search = new Rect(innerX, tabs.bottom() + 12, innerWidth, ClickGuiPalette.SEARCH_HEIGHT);
+        Rect footer = new Rect(innerX, window.bottom() - ClickGuiPalette.INNER_PADDING - ClickGuiPalette.FOOTER_HEIGHT, innerWidth, ClickGuiPalette.FOOTER_HEIGHT);
         Rect list = new Rect(
-                content.x(),
-                search.bottom() + 6,
-                content.width(),
-                content.bottom() - (search.bottom() + 6)
+                innerX,
+                search.bottom() + 12,
+                innerWidth,
+                footer.y() - (search.bottom() + 20)
         );
 
-        return new ClickGuiLayout(window, sidebar, content, search, list, sidebar.y() + 28, content.y() + 2);
+        return new ClickGuiLayout(window, header, tabs, search, list, footer);
+    }
+
+    ClickGuiLayout translate(int dx, int dy) {
+        return new ClickGuiLayout(
+                window.translate(dx, dy),
+                header.translate(dx, dy),
+                tabs.translate(dx, dy),
+                search.translate(dx, dy),
+                list.translate(dx, dy),
+                footer.translate(dx, dy)
+        );
     }
 
     record Rect(int x, int y, int width, int height) {
@@ -58,8 +55,20 @@ record ClickGuiLayout(
             return y + height;
         }
 
+        int centerX() {
+            return x + (width / 2);
+        }
+
+        int centerY() {
+            return y + (height / 2);
+        }
+
         boolean contains(double mouseX, double mouseY) {
             return mouseX >= x && mouseX < right() && mouseY >= y && mouseY < bottom();
+        }
+
+        Rect translate(int dx, int dy) {
+            return new Rect(x + dx, y + dy, width, height);
         }
     }
 }

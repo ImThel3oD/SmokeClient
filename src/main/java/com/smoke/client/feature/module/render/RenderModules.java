@@ -11,6 +11,7 @@ public final class RenderModules {
         moduleManager.register(new HudModule(moduleContext));
         moduleManager.register(new InfoModule(moduleContext));
         moduleManager.register(new TargetHudModule(moduleContext));
+        moduleManager.register(new BedEspModule(moduleContext));
         moduleManager.register(new ChestEspModule(moduleContext));
         moduleManager.register(new EspModule(moduleContext));
         moduleManager.register(new TracersModule(moduleContext));
