@@ -62,6 +62,13 @@ public final class RotationService {
     private float lastInjectedPitch = Float.NaN;
 
     /**
+     * After a silent rotation releases, the server still keeps the last injected yaw/pitch until
+     * another look packet is sent. Force a one-shot camera sync on the next move packet so movement
+     * does not continue under a stale silent yaw after ownership has been dropped.
+     */
+    private boolean pendingCameraSync;
+
+    /**
      * After {@link #release(String)}, vanilla may send camera rotation for one or more ticks.
      * SILENT_STICKY must not resume from {@link #lastServerYaw} until we seed from the camera again.
      */
@@ -83,6 +90,9 @@ public final class RotationService {
 
         activeRequests.remove(ownerId);
         if (currentFrame.active() && currentFrame.ownerId().equals(ownerId)) {
+            if (currentFrame.applyPacketRotation()) {
+                pendingCameraSync = true;
+            }
             currentFrame = RotationFrame.inactive();
         }
         if (activeOwnerId != null && activeOwnerId.equals(ownerId)) {
@@ -174,6 +184,7 @@ public final class RotationService {
         lastInjectedPitch = Float.NaN;
         steppedTick = Long.MIN_VALUE;
         invalidateStickyResume = false;
+        pendingCameraSync = false;
     }
 
     @Subscribe
@@ -193,6 +204,11 @@ public final class RotationService {
         }
 
         if (!currentFrame.active() || !currentFrame.applyPacketRotation()) {
+            if (pendingCameraSync) {
+                injectLook(event, movePacket, player, player.getYaw(), player.getPitch());
+                pendingCameraSync = false;
+                return;
+            }
             lastInjectedYaw = Float.NaN;
             lastInjectedPitch = Float.NaN;
             return;
@@ -343,11 +359,15 @@ public final class RotationService {
             currentFrame = RotationFrame.inactive();
             activeOwnerId = null;
             hasServerRotation = false;
+            pendingCameraSync = false;
             return;
         }
 
         ActiveRequest winner = chooseWinner();
         if (winner == null) {
+            if (currentFrame.active() && currentFrame.applyPacketRotation()) {
+                pendingCameraSync = true;
+            }
             currentFrame = RotationFrame.inactive();
             activeOwnerId = null;
             hasServerRotation = false;
@@ -378,6 +398,7 @@ public final class RotationService {
 
         boolean movementYawOverridden = request.movementYawOverride() != null;
         float movementYaw = movementYawOverridden ? request.movementYawOverride() : player.getYaw();
+        pendingCameraSync = false;
 
         currentFrame = new RotationFrame(
                 true,
@@ -466,6 +487,36 @@ public final class RotationService {
         double sensitivity = client.options.getMouseSensitivity().getValue();
         double scaled = sensitivity * 0.6D + 0.2D;
         return (float) (scaled * scaled * scaled * 1.2D);
+    }
+
+    private void injectLook(PacketOutboundEvent event, PlayerMoveC2SPacket movePacket, ClientPlayerEntity player, float yaw, float pitch) {
+        if (movePacket instanceof PlayerMoveC2SPacket.Full fullPacket) {
+            event.replace(new PlayerMoveC2SPacket.Full(
+                    fullPacket.getX(player.getX()),
+                    fullPacket.getY(player.getY()),
+                    fullPacket.getZ(player.getZ()),
+                    yaw, pitch,
+                    fullPacket.isOnGround(),
+                    fullPacket.horizontalCollision()
+            ));
+        } else if (movePacket instanceof PlayerMoveC2SPacket.PositionAndOnGround positionPacket) {
+            event.replace(new PlayerMoveC2SPacket.Full(
+                    positionPacket.getX(player.getX()),
+                    positionPacket.getY(player.getY()),
+                    positionPacket.getZ(player.getZ()),
+                    yaw, pitch,
+                    positionPacket.isOnGround(),
+                    positionPacket.horizontalCollision()
+            ));
+        } else {
+            event.replace(new PlayerMoveC2SPacket.LookAndOnGround(
+                    yaw, pitch,
+                    movePacket.isOnGround(),
+                    movePacket.horizontalCollision()
+            ));
+        }
+        lastInjectedYaw = yaw;
+        lastInjectedPitch = pitch;
     }
 
     private static Vec2f rotateInput(Vec2f input, float deltaYaw) {
