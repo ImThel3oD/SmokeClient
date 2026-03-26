@@ -2,9 +2,7 @@ package com.smoke.client.feature.module.render;
 
 import com.smoke.client.event.Subscribe;
 import com.smoke.client.event.events.HudRenderEvent;
-import com.smoke.client.feature.module.combat.KillAuraModule;
-import com.smoke.client.feature.module.combat.SilentAuraModule;
-import com.smoke.client.feature.module.combat.TriggerBotModule;
+import com.smoke.client.module.CombatTargetProvider;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
@@ -115,12 +113,12 @@ public final class TargetHudModule extends Module implements Draggable {
     }
 
     private Entity resolveTarget() {
-        KillAuraModule killAura = context().modules().getByType(KillAuraModule.class).orElse(null);
-        if (killAura != null && killAura.enabled() && killAura.getTarget() != null) return killAura.getTarget();
-        SilentAuraModule silentAura = context().modules().getByType(SilentAuraModule.class).orElse(null);
-        if (silentAura != null && silentAura.enabled() && silentAura.getTarget() != null) return silentAura.getTarget();
-        TriggerBotModule triggerBot = context().modules().getByType(TriggerBotModule.class).orElse(null);
-        return triggerBot != null && triggerBot.enabled() ? triggerBot.getTarget() : null;
+        for (Module module : context().modules().enabledModules()) {
+            if (module instanceof CombatTargetProvider provider && provider.currentCombatTarget() != null) {
+                return provider.currentCombatTarget();
+            }
+        }
+        return null;
     }
 
     private static int healthColor(float ratio) {

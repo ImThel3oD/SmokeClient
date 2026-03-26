@@ -46,11 +46,11 @@ public final class VelocityModule extends Module {
             case JUMP -> client.execute(() -> client.execute(() -> {
                 if (client.player != null && client.player.isOnGround()) client.player.jump();
             }));
-            case REVERSE -> client.player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(
+            case REVERSE -> context().packets().send(new PlayerMoveC2SPacket.Full(
                     client.player.getPos(), client.player.getYaw(), client.player.getPitch(), client.player.isOnGround(), client.player.horizontalCollision));
             case SPRINT_RESET -> {
-                client.player.networkHandler.sendPacket(new ClientCommandC2SPacket(client.player, ClientCommandC2SPacket.Mode.STOP_SPRINTING));
-                client.player.networkHandler.sendPacket(new ClientCommandC2SPacket(client.player, ClientCommandC2SPacket.Mode.START_SPRINTING));
+                context().packets().send(new ClientCommandC2SPacket(client.player, ClientCommandC2SPacket.Mode.STOP_SPRINTING));
+                context().packets().send(new ClientCommandC2SPacket(client.player, ClientCommandC2SPacket.Mode.START_SPRINTING));
             }
             case REDUCE -> { }
         }

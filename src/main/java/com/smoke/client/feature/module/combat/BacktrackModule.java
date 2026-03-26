@@ -1,8 +1,10 @@
 package com.smoke.client.feature.module.combat;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.smoke.client.SmokeClient;
 import com.smoke.client.event.EventPriority;
 import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.AttackEntityPostEvent;
 import com.smoke.client.event.events.PacketInboundEvent;
 import com.smoke.client.event.events.TickEvent;
 import com.smoke.client.event.events.WorldRenderEvent;
@@ -271,6 +273,11 @@ public final class BacktrackModule extends Module {
         trackTarget(targetEntity instanceof LivingEntity livingTarget ? livingTarget : null);
     }
 
+    @Subscribe
+    private void onAttackEntityPost(AttackEntityPostEvent event) {
+        recordAttackTarget(event.target());
+    }
+
     private void flushDuePackets() {
         long now = System.currentTimeMillis();
         while (true) {
@@ -325,7 +332,8 @@ public final class BacktrackModule extends Module {
                 return;
             }
             applyPacket(packet, listener);
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            SmokeClient.LOGGER.warn("Failed to replay buffered inbound packet {}", bufferedPacket.packet().getClass().getName(), exception);
         } finally {
             replaying.set(false);
         }

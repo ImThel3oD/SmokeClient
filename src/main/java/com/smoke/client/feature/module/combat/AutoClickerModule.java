@@ -2,12 +2,13 @@ package com.smoke.client.feature.module.combat;
 
 import com.smoke.client.event.Subscribe;
 import com.smoke.client.event.events.HandleInputEvent;
-import com.smoke.client.mixin.accessor.MinecraftClientAccessor;
+import com.smoke.client.mixin.accessor.KeyBindingAccessor;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
 import com.smoke.client.setting.NumberSetting;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.KeyBinding;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -23,6 +24,13 @@ public final class AutoClickerModule extends Module {
     }
 
     @Override
+    public String displaySuffix() {
+        double min = minCps.value();
+        double max = Math.max(min, maxCps.value());
+        return "CPS " + formatNumber(min) + " - " + formatNumber(max);
+    }
+
+    @Override
     protected void onDisable() {
         reset();
     }
@@ -32,11 +40,11 @@ public final class AutoClickerModule extends Module {
         if (event.phase() != HandleInputEvent.Phase.POST) return;
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.world == null || client.interactionManager == null || client.options == null
-                || client.crosshairTarget == null || client.currentScreen != null || client.getOverlay() != null
+                || client.currentScreen != null || client.getOverlay() != null
                 || !client.options.attackKey.isPressed()) { reset(); return; }
         long now = System.currentTimeMillis();
         if (now - lastClickMs < delayMs) return;
-        ((MinecraftClientAccessor) (Object) client).smoke$doAttack();
+        KeyBinding.onKeyPressed(((KeyBindingAccessor) client.options.attackKey).smoke$getBoundKey());
         lastClickMs = now;
         delayMs = nextDelayMs();
     }

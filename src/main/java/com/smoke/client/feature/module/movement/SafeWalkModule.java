@@ -1,5 +1,7 @@
 package com.smoke.client.feature.module.movement;
 
+import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.ClipAtLedgeEvent;
 import com.smoke.client.mixin.accessor.InputAccessor;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
@@ -13,6 +15,13 @@ public final class SafeWalkModule extends Module {
 
     public SafeWalkModule(ModuleContext context) {
         super(context, "safe_walk", "SafeWalk", "Stops the player from walking off edges.", ModuleCategory.MOVEMENT, GLFW.GLFW_KEY_UNKNOWN);
+    }
+
+    @Subscribe
+    private void onClipAtLedge(ClipAtLedgeEvent event) {
+        if (shouldForceClip(event.player())) {
+            event.forceClip(true);
+        }
     }
 
     public boolean shouldForceClip(ClientPlayerEntity player) {

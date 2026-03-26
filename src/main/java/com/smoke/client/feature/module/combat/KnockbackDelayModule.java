@@ -1,11 +1,14 @@
 package com.smoke.client.feature.module.combat;
 
+import com.smoke.client.event.EventPriority;
 import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.AttackEntityPostEvent;
 import com.smoke.client.event.events.TickEvent;
-import com.smoke.client.feature.module.player.FakeLagModule;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
+import com.smoke.client.network.ImmediatePacketSender;
+import com.smoke.client.network.OutboundPacketInterceptor;
 import com.smoke.client.setting.NumberSetting;
 import io.netty.channel.ChannelFutureListener;
 import net.minecraft.client.MinecraftClient;
@@ -20,8 +23,7 @@ import org.lwjgl.glfw.GLFW;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class KnockbackDelayModule extends Module {
-    private static volatile KnockbackDelayModule instance;
+public final class KnockbackDelayModule extends Module implements OutboundPacketInterceptor {
     private final NumberSetting chanceMin = addSetting(new NumberSetting("chance_min", "Chance Min", "Minimum activation chance percent.", 80.0D, 10.0D, 100.0D, 1.0D));
     private final NumberSetting chanceMax = addSetting(new NumberSetting("chance_max", "Chance Max", "Maximum activation chance percent.", 100.0D, 10.0D, 100.0D, 1.0D));
     private final NumberSetting airMin = addSetting(new NumberSetting("air_delay_min", "Air Delay Min", "Minimum airborne hold in milliseconds.", 200.0D, 50.0D, 5000.0D, 1.0D));
@@ -31,8 +33,7 @@ public final class KnockbackDelayModule extends Module {
     private final ConcurrentLinkedDeque<Entry> queue = new ConcurrentLinkedDeque<>();
     private long releaseAt;
 
-    public KnockbackDelayModule(ModuleContext context) { super(context, "knockback_delay", "KnockbackDelay", "Delays outbound packets briefly after hits so knockback lands later.", ModuleCategory.COMBAT, GLFW.GLFW_KEY_UNKNOWN); instance = this; }
-    public static boolean intercept(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) { return instance != null && instance.queue(connection, packet, listener, flush); }
+    public KnockbackDelayModule(ModuleContext context) { super(context, "knockback_delay", "KnockbackDelay", "Delays outbound packets briefly after hits so knockback lands later.", ModuleCategory.COMBAT, GLFW.GLFW_KEY_UNKNOWN); }
 
     public void trigger(Entity target) {
         MinecraftClient client = MinecraftClient.getInstance();
@@ -52,12 +53,18 @@ public final class KnockbackDelayModule extends Module {
     @Override protected void onEnable() { queue.clear(); releaseAt = 0L; }
     @Override protected void onDisable() { releaseAt = 0L; flushAll(); }
 
-    private boolean queue(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) {
+    @Subscribe(priority = EventPriority.LOW)
+    private void onAttackEntityPost(AttackEntityPostEvent event) {
+        trigger(event.target());
+    }
+
+    @Override
+    public boolean interceptOutbound(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) {
         if (!enabled() || releaseAt == 0L || connection == null || packet == null || !connection.isOpen() || packet instanceof KeepAliveC2SPacket) return false;
         queue.addLast(new Entry(connection, packet, listener, flush)); return true;
     }
 
-    private void flushAll() { for (Entry entry; (entry = queue.pollFirst()) != null; ) if (entry.connection.isOpen()) ((FakeLagModule.Sender) entry.connection).smoke$sendImmediately(entry.packet, entry.listener, entry.flush); }
+    private void flushAll() { for (Entry entry; (entry = queue.pollFirst()) != null; ) if (entry.connection.isOpen()) ((ImmediatePacketSender) entry.connection).smoke$sendImmediately(entry.packet, entry.listener, entry.flush); }
     private static double roll(NumberSetting min, NumberSetting max) { double a = Math.min(min.value(), max.value()), b = Math.max(min.value(), max.value()); return a == b ? a : ThreadLocalRandom.current().nextDouble(a, b); }
     private record Entry(ClientConnection connection, Packet<?> packet, @Nullable ChannelFutureListener listener, boolean flush) {}
 }

@@ -1,8 +1,11 @@
 package com.smoke.client.feature.module.combat;
 
+import com.smoke.client.event.EventPriority;
 import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.AttackEntityPreEvent;
 import com.smoke.client.event.events.MovementInputEvent;
 import com.smoke.client.event.events.TickEvent;
+import com.smoke.client.module.AttackGate;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
@@ -22,7 +25,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 import org.lwjgl.glfw.GLFW;
 
-public final class CriticalsModule extends Module {
+public final class CriticalsModule extends Module implements AttackGate {
     private static final int TIMEOUT = 10;
     private Entity target;
     private int ticks;
@@ -40,6 +43,19 @@ public final class CriticalsModule extends Module {
         ticks = TIMEOUT;
         requestJump = true;
         return true;
+    }
+
+    @Override
+    public boolean shouldBlockAttack(Entity target) {
+        return delay(target);
+    }
+
+    @Subscribe(priority = EventPriority.HIGHEST)
+    private void onAttackEntityPre(AttackEntityPreEvent event) {
+        if (delay(event.target())) {
+            event.cancel();
+            event.stopPropagation();
+        }
     }
 
     @Subscribe

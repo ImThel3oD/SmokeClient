@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.EntityLabelVisibilityEvent;
 import com.smoke.client.event.events.WorldRenderEvent;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
@@ -39,8 +40,6 @@ import java.util.List;
 import java.util.SequencedMap;
 
 public final class NameTagsModule extends Module {
-    private static NameTagsModule instance;
-
     private static final float LABEL_SCALE = 0.025F;
     private static final int FULL_BRIGHT = 0xF000F0;
     private static final int BAR_WIDTH = 3;
@@ -79,7 +78,6 @@ public final class NameTagsModule extends Module {
         super(context, "nametags", "NameTags",
                 "Renders custom name tags with health and equipment above entities.",
                 ModuleCategory.RENDER, GLFW.GLFW_KEY_UNKNOWN);
-        instance = this;
     }
 
     @Override
@@ -334,19 +332,29 @@ public final class NameTagsModule extends Module {
         };
     }
 
-    public static boolean shouldSuppressLabel(Entity entity) {
-        NameTagsModule module = instance;
-        if (module == null || !module.enabled()) {
-            return false;
+    @Subscribe
+    private void onEntityLabelVisibility(EntityLabelVisibilityEvent event) {
+        if (!event.visible()) {
+            return;
         }
 
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.player == null || entity == client.player) {
+        if (client == null || shouldSuppressLabel(client, event.entity())) {
+            event.setVisible(false);
+        }
+    }
+
+    private boolean shouldSuppressLabel(MinecraftClient client, Entity entity) {
+        if (client == null || client.player == null) {
             return false;
         }
 
-        double maxDistSq = module.range.value() * module.range.value();
-        return module.isHandledEntity(client, entity, maxDistSq);
+        if (entity == client.player) {
+            return false;
+        }
+
+        double maxDistSq = range.value() * range.value();
+        return isHandledEntity(client, entity, maxDistSq);
     }
 
     private static int healthColor(float fraction) {

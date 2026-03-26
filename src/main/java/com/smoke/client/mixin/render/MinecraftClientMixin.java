@@ -1,6 +1,7 @@
 package com.smoke.client.mixin.render;
 
-import com.smoke.client.feature.module.render.EspModule;
+import com.smoke.client.SmokeClient;
+import com.smoke.client.event.events.EntityOutlineStateEvent;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,11 +14,16 @@ public abstract class MinecraftClientMixin {
 
     @Inject(method = "hasOutline", at = @At("RETURN"), cancellable = true)
     private void smoke$hasOutline(Entity entity, CallbackInfoReturnable<Boolean> cir) {
-        if (!EspModule.isSupportedEntityTargetType(entity)) {
+        if (SmokeClient.getRuntime() == null) {
             return;
         }
-        if (!cir.getReturnValue() && EspModule.shouldRenderOutline(entity)) {
-            cir.setReturnValue(true);
+
+        boolean outlined = cir.getReturnValueZ();
+        EntityOutlineStateEvent event = SmokeClient.getRuntime().eventBus().post(
+                new EntityOutlineStateEvent(entity, outlined)
+        );
+        if (event.outlined() != outlined) {
+            cir.setReturnValue(event.outlined());
         }
     }
 }

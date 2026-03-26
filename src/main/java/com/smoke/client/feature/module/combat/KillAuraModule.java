@@ -2,6 +2,8 @@ package com.smoke.client.feature.module.combat;
 
 import com.smoke.client.event.Subscribe;
 import com.smoke.client.event.events.TickEvent;
+import com.smoke.client.module.AttackGate;
+import com.smoke.client.module.CombatTargetProvider;
 import com.smoke.client.mixin.accessor.MinecraftClientAccessor;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
@@ -30,7 +32,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class KillAuraModule extends Module {
+public final class KillAuraModule extends Module implements CombatTargetProvider {
     private static final int ROTATION_PRIORITY = 220;
 
     private final NumberSetting range = addSetting(new NumberSetting("range", "Range", "Maximum target distance.", 3.0D, 1.0D, 6.0D, 0.1D));
@@ -52,6 +54,18 @@ public final class KillAuraModule extends Module {
 
     public Entity getTarget() {
         return plannedTarget;
+    }
+
+    @Override
+    public Entity currentCombatTarget() {
+        return plannedTarget;
+    }
+
+    @Override
+    public String displaySuffix() {
+        double min = minCps.value();
+        double max = Math.max(min, maxCps.value());
+        return "CPS " + formatNumber(min) + " - " + formatNumber(max);
     }
 
     @Override
@@ -97,8 +111,11 @@ public final class KillAuraModule extends Module {
                 : syntheticHit(mc.player, plannedTarget);
         if (raytrace.value() == RaytraceSetting.STRICT && hit == null) return;
 
-        CriticalsModule criticals = context().modules().getByType(CriticalsModule.class).orElse(null);
-        if (criticals != null && criticals.enabled() && criticals.delay(plannedTarget)) return;
+        for (Module module : context().modules().enabledModules()) {
+            if (module instanceof AttackGate attackGate && attackGate.shouldBlockAttack(plannedTarget)) {
+                return;
+            }
+        }
 
         attack(mc, hit);
         remainingDelayTicks = nextDelayTicks();

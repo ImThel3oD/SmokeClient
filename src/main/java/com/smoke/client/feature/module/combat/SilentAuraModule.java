@@ -5,6 +5,7 @@ import com.smoke.client.event.Subscribe;
 import com.smoke.client.event.events.TickEvent;
 import com.smoke.client.event.events.WorldRenderEvent;
 import com.smoke.client.mixin.accessor.MinecraftClientAccessor;
+import com.smoke.client.module.CombatTargetProvider;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
@@ -35,7 +36,7 @@ import net.minecraft.world.RaycastContext;
 import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 
-public final class SilentAuraModule extends Module {
+public final class SilentAuraModule extends Module implements CombatTargetProvider {
     private static final int ROTATION_PRIORITY = 220;
     private static final int CIRCLE_SEGMENTS = 64;
     private static final int GLOW_RINGS = 12;
@@ -60,6 +61,11 @@ public final class SilentAuraModule extends Module {
     }
 
     public Entity getTarget() {
+        return currentTarget;
+    }
+
+    @Override
+    public Entity currentCombatTarget() {
         return currentTarget;
     }
 

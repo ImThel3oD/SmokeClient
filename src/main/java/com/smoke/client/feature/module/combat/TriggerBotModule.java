@@ -2,6 +2,7 @@ package com.smoke.client.feature.module.combat;
 
 import com.smoke.client.event.Subscribe;
 import com.smoke.client.event.events.TickEvent;
+import com.smoke.client.module.CombatTargetProvider;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
@@ -18,7 +19,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class TriggerBotModule extends Module {
+public final class TriggerBotModule extends Module implements CombatTargetProvider {
     private final NumberSetting range = addSetting(new NumberSetting("range", "Range", "Maximum trigger distance.", 3.0D, 1.0D, 6.0D, 0.1D));
     private final NumberSetting minCps = addSetting(new NumberSetting("min_cps", "Min CPS", "Minimum clicks per second.", 9.0D, 7.0D, 20.0D, 1.0D));
     private final NumberSetting maxCps = addSetting(new NumberSetting("max_cps", "Max CPS", "Maximum clicks per second.", 12.0D, 7.0D, 20.0D, 1.0D));
@@ -35,6 +36,18 @@ public final class TriggerBotModule extends Module {
 
     public Entity getTarget() {
         return target;
+    }
+
+    @Override
+    public Entity currentCombatTarget() {
+        return target;
+    }
+
+    @Override
+    public String displaySuffix() {
+        double min = minCps.value();
+        double max = Math.max(min, maxCps.value());
+        return "CPS " + formatNumber(min) + " - " + formatNumber(max);
     }
 
     @Subscribe

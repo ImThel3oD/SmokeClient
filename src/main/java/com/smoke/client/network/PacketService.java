@@ -3,6 +3,7 @@ package com.smoke.client.network;
 import com.smoke.client.event.EventBus;
 import com.smoke.client.event.events.PacketInboundEvent;
 import com.smoke.client.event.events.PacketOutboundEvent;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.network.packet.Packet;
 
 import java.util.Objects;
@@ -58,6 +59,17 @@ public final class PacketService {
         PacketInboundEvent event = new PacketInboundEvent(packet);
         eventBus.post(event);
         return new PacketDecision(event.packet(), event.isCancelled());
+    }
+
+    public boolean send(Packet<?> packet) {
+        Objects.requireNonNull(packet, "packet");
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.getNetworkHandler() == null) {
+            return false;
+        }
+
+        client.getNetworkHandler().sendPacket(packet);
+        return true;
     }
 
     private PacketDecision prepare(Packet<?> packet, ThreadLocal<PreparedDecision> storage, boolean outbound) {

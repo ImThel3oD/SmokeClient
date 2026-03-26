@@ -13,10 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 public final class AltScreen extends Screen {
-    private static final int PANEL_WIDTH = 520;
-    private static final int PANEL_MARGIN = 22;
     private static final int ENTRY_HEIGHT = 30;
-    private static final int BUTTON_HEIGHT = 20;
     private static final long DOUBLE_CLICK_MS = 350L;
     private static final int ACCENT = 0xFF4DA6FF;
     private static final int STATUS_ERROR = 0xFFFF6666;
@@ -27,23 +24,12 @@ public final class AltScreen extends Screen {
 
     private final Screen parent;
     private TextFieldWidget apiKeyField;
-
-    private final int[] generateButton = new int[4];
-    private final int[] loginButton = new int[4];
-    private final int[] restoreButton = new int[4];
-    private final int[] deleteButton = new int[4];
-    private final int[] backButton = new int[4];
+    private AltScreenLayout layout;
 
     private String apiKey = "";
     private List<AltAccount> alts = new ArrayList<>();
     private final Set<String> errorAlts = ConcurrentHashMap.newKeySet();
 
-    private int panelLeft;
-    private int panelRight;
-    private int panelTop;
-    private int panelBottom;
-    private int listTop;
-    private int listBottom;
     private int scroll;
     private int maxScroll;
     private int selectedIndex = -1;
@@ -68,15 +54,16 @@ public final class AltScreen extends Screen {
         AlteningService.AltData data = AlteningService.loadData();
         apiKey = data.apiKey;
         alts = new ArrayList<>(data.alts);
+        refreshLayout();
 
-        panelLeft = this.width / 2 - PANEL_WIDTH / 2;
-        panelRight = panelLeft + PANEL_WIDTH;
-        panelTop = PANEL_MARGIN;
-        panelBottom = this.height - PANEL_MARGIN;
-
-        int apiY = panelTop + 38;
-        int fieldWidth = PANEL_WIDTH - 180;
-        apiKeyField = new TextFieldWidget(this.textRenderer, panelLeft + 95, apiY, fieldWidth, 18, Text.literal("API Key"));
+        apiKeyField = new TextFieldWidget(
+                this.textRenderer,
+                layout.apiKeyField().x(),
+                layout.apiKeyField().y(),
+                layout.apiKeyField().width(),
+                layout.apiKeyField().height(),
+                Text.literal("API Key")
+        );
         apiKeyField.setMaxLength(128);
         apiKeyField.setText(apiKey);
         addDrawableChild(apiKeyField);
@@ -111,7 +98,7 @@ public final class AltScreen extends Screen {
         generateEnabled = false;
         setStatus("Generating alt...", STATUS_INFO);
 
-        Thread worker = new Thread(() -> {
+        startWorker("Smoke-AltGenerate", () -> {
             try {
                 AltAccount account = AlteningApiClient.generate(key);
                 MinecraftClient.getInstance().execute(() -> {
@@ -136,9 +123,7 @@ public final class AltScreen extends Screen {
                     generateEnabled = true;
                 });
             }
-        }, "Smoke-AltGenerate");
-        worker.setDaemon(true);
-        worker.start();
+        });
     }
 
     private void loginSelected() {
@@ -156,7 +141,7 @@ public final class AltScreen extends Screen {
         loading = true;
         setStatus("Logging in as " + alt.getUsername() + "...", STATUS_INFO);
 
-        Thread worker = new Thread(() -> {
+        startWorker("Smoke-AltLogin", () -> {
             try {
                 String username = AlteningService.login(alt);
                 MinecraftClient.getInstance().execute(() -> {
@@ -172,9 +157,7 @@ public final class AltScreen extends Screen {
                     loading = false;
                 });
             }
-        }, "Smoke-AltLogin");
-        worker.setDaemon(true);
-        worker.start();
+        });
     }
 
     private void deleteSelected() {
@@ -200,47 +183,49 @@ public final class AltScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        panelLeft = this.width / 2 - PANEL_WIDTH / 2;
-        panelRight = panelLeft + PANEL_WIDTH;
-        panelTop = PANEL_MARGIN;
-        panelBottom = this.height - PANEL_MARGIN;
+        refreshLayout();
+        AltRect panel = layout.panel();
+        AltRect listRect = layout.list();
+        if (apiKeyField != null) {
+            apiKeyField.setX(layout.apiKeyField().x());
+            apiKeyField.setY(layout.apiKeyField().y());
+            apiKeyField.setWidth(layout.apiKeyField().width());
+        }
 
         context.fillGradient(0, 0, this.width, this.height, 0xF0101010, 0xF0010101);
-        context.fill(panelLeft, panelTop, panelRight, panelBottom, 0xF5151515);
-        border(context, panelLeft, panelTop, PANEL_WIDTH, panelBottom - panelTop, 0xFF2A2A2A);
-        context.fill(panelLeft, panelTop, panelRight, panelTop + 2, ACCENT);
+        context.fill(panel.x(), panel.y(), panel.right(), panel.bottom(), 0xF5151515);
+        AltScreenPaint.drawBorder(context, panel, 0xFF2A2A2A);
+        context.fill(panel.x(), panel.y(), panel.right(), panel.y() + 2, ACCENT);
 
-        context.drawText(this.textRenderer, Text.literal("Alt Manager"), panelLeft + 10, panelTop + 8, TEXT_COLOR, false);
+        context.drawText(this.textRenderer, Text.literal("Alt Manager"), panel.x() + 10, panel.y() + 8, TEXT_COLOR, false);
 
-        int apiY = panelTop + 38;
-        context.drawText(this.textRenderer, Text.literal("API Key"), panelLeft + 12, apiY + 5, TEXT_COLOR, false);
+        context.drawText(this.textRenderer, Text.literal("API Key"), panel.x() + 12, layout.apiY() + 5, TEXT_COLOR, false);
 
-        setRect(generateButton, panelRight - 80, apiY - 1, 68, BUTTON_HEIGHT);
-        drawButton(context, generateButton, mouseX, mouseY, "Generate", generateEnabled ? 0xFF2B6CB0 : 0xFF333333, true);
+        AltScreenPaint.drawButton(
+                context,
+                this.textRenderer,
+                layout.generateButton(),
+                mouseX,
+                mouseY,
+                "Generate",
+                generateEnabled ? 0xFF2B6CB0 : 0xFF333333,
+                true,
+                TEXT_COLOR,
+                TEXT_DIM
+        );
 
-        int actionsY = apiY + 26;
-        int gap = 8;
-        int totalWidth = PANEL_WIDTH - 24;
-        int buttonWidth = (totalWidth - gap * 2) / 3;
-        setRect(loginButton, panelLeft + 12, actionsY, buttonWidth, BUTTON_HEIGHT);
-        setRect(restoreButton, panelLeft + 12 + buttonWidth + gap, actionsY, buttonWidth, BUTTON_HEIGHT);
-        setRect(deleteButton, panelLeft + 12 + (buttonWidth + gap) * 2, actionsY, buttonWidth, BUTTON_HEIGHT);
+        AltScreenPaint.drawButton(context, this.textRenderer, layout.loginButton(), mouseX, mouseY, "Login", 0xFF2D8CFF, true, TEXT_COLOR, TEXT_DIM);
+        AltScreenPaint.drawButton(context, this.textRenderer, layout.restoreButton(), mouseX, mouseY, "Restore", 0xFF4A4A4A, true, TEXT_COLOR, TEXT_DIM);
+        AltScreenPaint.drawButton(context, this.textRenderer, layout.deleteButton(), mouseX, mouseY, "Delete", 0xFF9A3131, true, TEXT_COLOR, TEXT_DIM);
 
-        drawButton(context, loginButton, mouseX, mouseY, "Login", 0xFF2D8CFF, true);
-        drawButton(context, restoreButton, mouseX, mouseY, "Restore", 0xFF4A4A4A, true);
-        drawButton(context, deleteButton, mouseX, mouseY, "Delete", 0xFF9A3131, true);
-
-        int sectionY = actionsY + BUTTON_HEIGHT + 10;
-        context.fill(panelLeft + 8, sectionY, panelRight - 8, sectionY + 18, 0xFF101010);
-        context.drawText(this.textRenderer, Text.literal("Accounts"), panelLeft + 14, sectionY + 5, TEXT_COLOR, false);
+        context.fill(layout.accountsHeader().x(), layout.accountsHeader().y(), layout.accountsHeader().right(), layout.accountsHeader().bottom(), 0xFF101010);
+        context.drawText(this.textRenderer, Text.literal("Accounts"), panel.x() + 14, layout.accountsHeader().y() + 5, TEXT_COLOR, false);
         String countText = alts.size() + " total";
         int countWidth = this.textRenderer.getWidth(countText);
-        context.drawText(this.textRenderer, Text.literal(countText), panelRight - countWidth - 14, sectionY + 5, TEXT_DIM, false);
+        context.drawText(this.textRenderer, Text.literal(countText), panel.right() - countWidth - 14, layout.accountsHeader().y() + 5, TEXT_DIM, false);
 
-        listTop = sectionY + 18;
-        listBottom = panelBottom - 50;
-        int listHeight = listBottom - listTop;
-        context.fill(panelLeft + 8, listTop, panelRight - 8, listBottom, 0xFF0A0A0A);
+        int listHeight = listRect.height();
+        context.fill(listRect.x(), listRect.y(), listRect.right(), listRect.bottom(), 0xFF0A0A0A);
 
         int totalContentHeight = alts.size() * ENTRY_HEIGHT;
         maxScroll = Math.max(0, totalContentHeight - listHeight);
@@ -252,53 +237,53 @@ public final class AltScreen extends Screen {
         if (alts.isEmpty()) {
             String empty = "No alts yet. Click Generate.";
             int width = this.textRenderer.getWidth(empty);
-            context.drawText(this.textRenderer, Text.literal(empty), this.width / 2 - width / 2, listTop + listHeight / 2 - 4, TEXT_DIM, false);
+            context.drawText(this.textRenderer, Text.literal(empty), this.width / 2 - width / 2, listRect.y() + listHeight / 2 - 4, TEXT_DIM, false);
         } else {
-            context.enableScissor(panelLeft + 9, listTop, panelRight - 9, listBottom);
+            context.enableScissor(listRect.x() + 1, listRect.y(), listRect.right() - 1, listRect.bottom());
             for (int i = 0; i < alts.size(); i++) {
-                int entryY = listTop + i * ENTRY_HEIGHT - scroll;
-                if (entryY + ENTRY_HEIGHT < listTop || entryY > listBottom) {
+                int entryY = listRect.y() + i * ENTRY_HEIGHT - scroll;
+                if (entryY + ENTRY_HEIGHT < listRect.y() || entryY > listRect.bottom()) {
                     continue;
                 }
 
                 AltAccount alt = alts.get(i);
                 String username = alt.getUsername() == null || alt.getUsername().isBlank() ? "Unknown" : alt.getUsername();
                 boolean selected = i == selectedIndex;
-                boolean hovered = mouseX >= panelLeft + 10
-                        && mouseX < panelRight - 10
-                        && mouseY >= Math.max(listTop, entryY)
-                        && mouseY < Math.min(listBottom, entryY + ENTRY_HEIGHT);
+                boolean hovered = mouseX >= listRect.x() + 2
+                        && mouseX < listRect.right() - 2
+                        && mouseY >= Math.max(listRect.y(), entryY)
+                        && mouseY < Math.min(listRect.bottom(), entryY + ENTRY_HEIGHT);
                 boolean active = altSessionActive && username.equals(currentUsername);
                 boolean failed = errorAlts.contains(alt.getToken());
 
                 int bg = selected ? 0xFF1F1F1F : hovered ? 0xFF181818 : ((i & 1) == 0 ? 0xFF131313 : 0xFF101010);
-                context.fill(panelLeft + 10, entryY, panelRight - 10, entryY + ENTRY_HEIGHT - 1, bg);
+                context.fill(listRect.x() + 2, entryY, listRect.right() - 2, entryY + ENTRY_HEIGHT - 1, bg);
 
                 if (selected || active) {
-                    context.fill(panelLeft + 10, entryY, panelLeft + 13, entryY + ENTRY_HEIGHT - 1, active ? STATUS_OK : ACCENT);
+                    context.fill(listRect.x() + 2, entryY, listRect.x() + 5, entryY + ENTRY_HEIGHT - 1, active ? STATUS_OK : ACCENT);
                 }
 
-                context.drawText(this.textRenderer, Text.literal(username), panelLeft + 18, entryY + 8, active ? STATUS_OK : TEXT_COLOR, false);
-                context.drawText(this.textRenderer, Text.literal(maskToken(alt.getToken())), panelLeft + 170, entryY + 8, TEXT_DIM, false);
+                context.drawText(this.textRenderer, Text.literal(username), listRect.x() + 10, entryY + 8, active ? STATUS_OK : TEXT_COLOR, false);
+                context.drawText(this.textRenderer, Text.literal(maskToken(alt.getToken())), listRect.x() + 162, entryY + 8, TEXT_DIM, false);
 
                 String state = active ? "ONLINE" : (failed ? "ERROR" : "OFFLINE");
                 int stateColor = active ? STATUS_OK : (failed ? STATUS_ERROR : TEXT_DIM);
                 int stateWidth = this.textRenderer.getWidth(state);
-                context.drawText(this.textRenderer, Text.literal(state), panelRight - stateWidth - 18, entryY + 8, stateColor, false);
+                context.drawText(this.textRenderer, Text.literal(state), panel.right() - stateWidth - 18, entryY + 8, stateColor, false);
             }
             context.disableScissor();
 
             if (maxScroll > 0) {
-                int scrollbarX = panelRight - 12;
+                int scrollbarX = listRect.right() - 4;
                 float ratio = (float) listHeight / Math.max(1, totalContentHeight);
                 int thumbHeight = Math.max(20, (int) (listHeight * ratio));
-                int thumbY = listTop + (int) ((listHeight - thumbHeight) * (scroll / (float) maxScroll));
-                context.fill(scrollbarX, listTop, scrollbarX + 3, listBottom, 0xFF222222);
+                int thumbY = listRect.y() + (int) ((listHeight - thumbHeight) * (scroll / (float) maxScroll));
+                context.fill(scrollbarX, listRect.y(), scrollbarX + 3, listRect.bottom(), 0xFF222222);
                 context.fill(scrollbarX, thumbY, scrollbarX + 3, thumbY + thumbHeight, 0xFF707070);
             }
         }
 
-        int statusY = listBottom + 6;
+        int statusY = listRect.bottom() + 6;
         if (!status.isEmpty()) {
             int alpha = 255;
             long age = System.currentTimeMillis() - statusTime;
@@ -307,17 +292,15 @@ public final class AltScreen extends Screen {
             }
             if (alpha > 0) {
                 int faded = (statusColor & 0x00FFFFFF) | (alpha << 24);
-                context.drawText(this.textRenderer, Text.literal(status), panelLeft + 10, statusY, faded, false);
+                context.drawText(this.textRenderer, Text.literal(status), panel.x() + 10, statusY, faded, false);
             }
         }
 
         String sessionLine = (AlteningService.isAltSessionActive() ? "Alt: " : "Original: ")
                 + (this.client != null ? this.client.getSession().getUsername() : "Unknown");
-        context.drawText(this.textRenderer, Text.literal(sessionLine), panelLeft + 10, statusY + 12, TEXT_DIM, false);
+        context.drawText(this.textRenderer, Text.literal(sessionLine), panel.x() + 10, statusY + 12, TEXT_DIM, false);
 
-        int bottomY = panelBottom - 26;
-        setRect(backButton, panelRight - 72, bottomY, 60, BUTTON_HEIGHT);
-        drawButton(context, backButton, mouseX, mouseY, "Back", 0xFF3F3F3F, true);
+        AltScreenPaint.drawButton(context, this.textRenderer, layout.backButton(), mouseX, mouseY, "Back", 0xFF3F3F3F, true, TEXT_COLOR, TEXT_DIM);
 
         super.render(context, mouseX, mouseY, delta);
     }
@@ -326,36 +309,38 @@ public final class AltScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int mx = (int) mouseX;
         int my = (int) mouseY;
+        AltScreenLayout currentLayout = layout();
+        AltRect listRect = currentLayout.list();
 
         if (button == 0) {
-            if (inRect(mx, my, generateButton) && generateEnabled) {
+            if (currentLayout.generateButton().contains(mx, my) && generateEnabled) {
                 generateAlt();
                 return true;
             }
-            if (inRect(mx, my, loginButton)) {
+            if (currentLayout.loginButton().contains(mx, my)) {
                 loginSelected();
                 return true;
             }
-            if (inRect(mx, my, restoreButton)) {
+            if (currentLayout.restoreButton().contains(mx, my)) {
                 restoreOriginalSession();
                 return true;
             }
-            if (inRect(mx, my, deleteButton)) {
+            if (currentLayout.deleteButton().contains(mx, my)) {
                 deleteSelected();
                 return true;
             }
-            if (inRect(mx, my, backButton)) {
+            if (currentLayout.backButton().contains(mx, my)) {
                 close();
                 return true;
             }
 
-            if (mx >= panelLeft + 10 && mx < panelRight - 10 && my >= listTop && my < listBottom) {
+            if (mx >= listRect.x() + 2 && mx < listRect.right() - 2 && my >= listRect.y() && my < listRect.bottom()) {
                 for (int i = 0; i < alts.size(); i++) {
-                    int entryY = listTop + i * ENTRY_HEIGHT - scroll;
-                    if (entryY + ENTRY_HEIGHT < listTop || entryY > listBottom) {
+                    int entryY = listRect.y() + i * ENTRY_HEIGHT - scroll;
+                    if (entryY + ENTRY_HEIGHT < listRect.y() || entryY > listRect.bottom()) {
                         continue;
                     }
-                    if (my < Math.max(listTop, entryY) || my >= Math.min(listBottom, entryY + ENTRY_HEIGHT)) {
+                    if (my < Math.max(listRect.y(), entryY) || my >= Math.min(listRect.bottom(), entryY + ENTRY_HEIGHT)) {
                         continue;
                     }
 
@@ -379,7 +364,7 @@ public final class AltScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (mouseX >= panelLeft + 8 && mouseX < panelRight - 8 && mouseY >= listTop && mouseY < listBottom) {
+        if (layout().list().contains(mouseX, mouseY)) {
             scroll -= (int) (verticalAmount * ENTRY_HEIGHT * 1.5D);
             scroll = clamp(scroll, 0, maxScroll);
             return true;
@@ -441,46 +426,21 @@ public final class AltScreen extends Screen {
         return "token " + "*".repeat(maskSize) + tail;
     }
 
-    private void drawButton(DrawContext context, int[] rect, int mouseX, int mouseY, String label, int color, boolean enabled) {
-        boolean hovered = enabled && inRect(mouseX, mouseY, rect);
-        int bg = enabled ? (hovered ? lighten(color, 0.18F) : color) : 0xFF2D2D2D;
-        context.fill(rect[0], rect[1], rect[0] + rect[2], rect[1] + rect[3], bg);
-        border(context, rect[0], rect[1], rect[2], rect[3], 0xFF111111);
-
-        int textWidth = this.textRenderer.getWidth(label);
-        int textX = rect[0] + rect[2] / 2 - textWidth / 2;
-        int textY = rect[1] + 6;
-        int textColor = enabled ? TEXT_COLOR : TEXT_DIM;
-        context.drawText(this.textRenderer, Text.literal(label), textX, textY, textColor, false);
+    private AltScreenLayout layout() {
+        if (layout == null) {
+            refreshLayout();
+        }
+        return layout;
     }
 
-    private static int lighten(int color, float factor) {
-        int a = (color >>> 24) & 0xFF;
-        int r = (color >>> 16) & 0xFF;
-        int g = (color >>> 8) & 0xFF;
-        int b = color & 0xFF;
-        r = Math.min(255, (int) (r + (255 - r) * factor));
-        g = Math.min(255, (int) (g + (255 - g) * factor));
-        b = Math.min(255, (int) (b + (255 - b) * factor));
-        return (a << 24) | (r << 16) | (g << 8) | b;
+    private void refreshLayout() {
+        layout = AltScreenLayout.create(this.width, this.height);
     }
 
-    private static void border(DrawContext context, int x, int y, int w, int h, int color) {
-        context.fill(x, y, x + w, y + 1, color);
-        context.fill(x, y + h - 1, x + w, y + h, color);
-        context.fill(x, y, x + 1, y + h, color);
-        context.fill(x + w - 1, y, x + w, y + h, color);
-    }
-
-    private static void setRect(int[] rect, int x, int y, int w, int h) {
-        rect[0] = x;
-        rect[1] = y;
-        rect[2] = w;
-        rect[3] = h;
-    }
-
-    private static boolean inRect(int x, int y, int[] rect) {
-        return x >= rect[0] && x < rect[0] + rect[2] && y >= rect[1] && y < rect[1] + rect[3];
+    private static void startWorker(String threadName, Runnable task) {
+        Thread worker = new Thread(task, threadName);
+        worker.setDaemon(true);
+        worker.start();
     }
 
     private static int clamp(int value, int min, int max) {

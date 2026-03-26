@@ -7,6 +7,8 @@
   "authors": [
     "kirtc"
   ],
+  "license": "MIT",
+  "icon": "assets/smoke/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [

@@ -1,5 +1,9 @@
 package com.smoke.client.feature.module.combat;
 
+import com.smoke.client.event.EventPriority;
+import com.smoke.client.event.Subscribe;
+import com.smoke.client.event.events.AttackEntityPostEvent;
+import com.smoke.client.event.events.AttackEntityPreEvent;
 import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleCategory;
 import com.smoke.client.module.ModuleContext;
@@ -17,6 +21,16 @@ public final class KeepSprintModule extends Module {
 
     public KeepSprintModule(ModuleContext context) {
         super(context, "keep_sprint", "KeepSprint", "Keeps sprint momentum after attacking.", ModuleCategory.COMBAT, GLFW.GLFW_KEY_UNKNOWN);
+    }
+
+    @Subscribe(priority = EventPriority.NORMAL)
+    private void onAttackEntityPre(AttackEntityPreEvent event) {
+        beforeAttack(event.player());
+    }
+
+    @Subscribe(priority = EventPriority.HIGH)
+    private void onAttackEntityPost(AttackEntityPostEvent event) {
+        afterAttack(event.player());
     }
 
     public void beforeAttack(PlayerEntity player) {

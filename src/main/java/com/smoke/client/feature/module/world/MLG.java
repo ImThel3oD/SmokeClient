@@ -42,7 +42,7 @@ public final class MLG extends Module {
         BlockHitResult hit = groundHit(client, player);
         if (hit == null || !placeable(client, hit.getBlockPos().up())) { aimHit = null; return; }
         aimHit = hit;
-        look(player);
+        sendLook(player);
         use(client, hit);
         if (player.getInventory().getStack(bucketSlot).isOf(Items.BUCKET)) {
             waterPos = hit.getBlockPos().up();
@@ -58,7 +58,7 @@ public final class MLG extends Module {
         if (!player.isOnGround() || ++collectTicks > COLLECT_TIMEOUT || bucketSlot < 0) { if (collectTicks > COLLECT_TIMEOUT) reset(true); return; }
         player.getInventory().setSelectedSlot(bucketSlot);
         if (!player.getInventory().getStack(bucketSlot).isOf(Items.BUCKET)) return;
-        look(player);
+        sendLook(player);
         use(client, aimHit);
         if (player.getInventory().getStack(bucketSlot).isOf(Items.WATER_BUCKET)) reset(true);
     }
@@ -68,8 +68,13 @@ public final class MLG extends Module {
         context().rotation().submit(new RotationRequest(id(), player.getYaw(), DOWN, PRIORITY, RotationRequest.TTL_PERSISTENT, 0.0F, 0.0F, RotationMode.VISIBLE, false, false));
     }
 
-    private static void look(ClientPlayerEntity player) {
-        player.networkHandler.sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(player.getYaw(), DOWN, player.isOnGround(), player.horizontalCollision));
+    private void sendLook(ClientPlayerEntity player) {
+        context().packets().send(new PlayerMoveC2SPacket.LookAndOnGround(
+                player.getYaw(),
+                DOWN,
+                player.isOnGround(),
+                player.horizontalCollision
+        ));
     }
 
     private static boolean shouldUse(ClientPlayerEntity player) {

@@ -6,6 +6,7 @@
   "client": [
     "accessor.EntityS2CPacketAccessor",
     "accessor.InputAccessor",
+    "accessor.KeyBindingAccessor",
     "accessor.LivingEntityAccessor",
     "accessor.MinecraftClientAccessor",
     "accessor.SimpleOptionAccessor",

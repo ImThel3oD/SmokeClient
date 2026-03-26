@@ -21,9 +21,11 @@ import com.smoke.client.feature.module.world.WorldModules;
 import com.smoke.client.input.BlocksModuleKeybindsScreen;
 import com.smoke.client.input.InputService;
 import com.smoke.client.module.ModuleConflictService;
+import com.smoke.client.module.ClientSessionListener;
 import com.smoke.client.module.ModuleContext;
 import com.smoke.client.module.ModuleManager;
 import com.smoke.client.network.PacketService;
+import com.smoke.client.network.OutboundPacketInterceptorService;
 import com.smoke.client.rotation.RotationService;
 import com.smoke.client.trace.ModuleTraceService;
 import com.smoke.client.ui.click.ClickGuiScreen;
@@ -42,6 +44,8 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.function.Consumer;
+
 public final class ClientRuntime {
     private static final Identifier HUD_LAYER_ID = Identifier.of(SmokeClient.MOD_ID, "hud");
 
@@ -49,6 +53,7 @@ public final class ClientRuntime {
     private final PacketService packetService = new PacketService(eventBus);
     private final RotationService rotationService = new RotationService();
     private final ModuleManager moduleManager = new ModuleManager(eventBus);
+    private final OutboundPacketInterceptorService outboundPacketInterceptorService = new OutboundPacketInterceptorService(moduleManager);
     private final CommandDispatcher commandDispatcher = new CommandDispatcher();
     private final ConfigService configService = new ConfigService(FabricLoader.getInstance().getConfigDir());
     private final InputService inputService = new InputService();
@@ -74,9 +79,9 @@ public final class ClientRuntime {
         ClientTickEvents.END_CLIENT_TICK.register(this::onTickEnd);
         ClientSendMessageEvents.ALLOW_CHAT.register(this::onAllowChatMessage);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
-                moduleManager.getByType(com.smoke.client.feature.module.player.FakeLagModule.class).ifPresent(com.smoke.client.feature.module.player.FakeLagModule::onDisconnect));
+                notifySessionListeners(ClientSessionListener::onClientDisconnect));
         ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, world) ->
-                moduleManager.getByType(com.smoke.client.feature.module.player.FakeLagModule.class).ifPresent(com.smoke.client.feature.module.player.FakeLagModule::onWorldChange));
+                notifySessionListeners(ClientSessionListener::onWorldChange));
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> shutdown());
         WorldRenderEvents.LAST.register(context -> eventBus.post(new WorldRenderEvent(context)));
         HudElementRegistry.addLast(HUD_LAYER_ID, (drawContext, tickCounter) -> {
@@ -103,6 +108,10 @@ public final class ClientRuntime {
 
     public CommandDispatcher commandDispatcher() {
         return commandDispatcher;
+    }
+
+    public OutboundPacketInterceptorService outboundPacketInterceptorService() {
+        return outboundPacketInterceptorService;
     }
 
     public ConfigService configService() {
@@ -226,6 +235,14 @@ public final class ClientRuntime {
                 openClickGui();
             } else if (client.currentScreen instanceof ClickGuiScreen) {
                 ((ClickGuiScreen) client.currentScreen).requestClose();
+            }
+        }
+    }
+
+    private void notifySessionListeners(Consumer<ClientSessionListener> callback) {
+        for (com.smoke.client.module.Module module : moduleManager.enabledModules()) {
+            if (module instanceof ClientSessionListener listener) {
+                callback.accept(listener);
             }
         }
     }
