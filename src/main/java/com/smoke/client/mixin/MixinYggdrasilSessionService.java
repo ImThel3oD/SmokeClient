@@ -3,6 +3,7 @@ package com.smoke.client.mixin;
 import com.mojang.authlib.yggdrasil.YggdrasilMinecraftSessionService;
 import com.smoke.client.SmokeClient;
 import com.smoke.client.alt.AlteningService;
+import com.smoke.client.util.PrivacySanitizer;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
@@ -74,7 +75,7 @@ public abstract class MixinYggdrasilSessionService {
                     this.joinUrl = URI.create(ALTENING_SESSION + "join").toURL();
                     this.checkUrl = URI.create(ALTENING_SESSION + "hasJoined").toURL();
                 } catch (Exception exception) {
-                    SmokeClient.LOGGER.warn("Failed to swap Altening session URLs: {}", exception.getMessage());
+                    SmokeClient.LOGGER.warn("Failed to swap Altening session URLs: {}", PrivacySanitizer.sanitizeThrowableMessage(exception));
                 }
             }
             return;

@@ -2,6 +2,7 @@ package com.smoke.client.alt;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.smoke.client.util.PrivacySanitizer;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLHandshakeException;
@@ -218,6 +219,6 @@ public final class AlteningApiClient {
         if (throwable == null || throwable.getMessage() == null || throwable.getMessage().isBlank()) {
             return "unknown error";
         }
-        return throwable.getMessage().trim();
+        return PrivacySanitizer.sanitize(throwable.getMessage().trim());
     }
 }
