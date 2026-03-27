@@ -1,5 +1,6 @@
 package com.smoke.client.alt;
 
+import com.smoke.client.util.PrivacySanitizer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -412,7 +413,7 @@ public final class AltScreen extends Screen {
         if (message == null || message.isBlank()) {
             return throwable.getClass().getSimpleName() + " during request.";
         }
-        return message;
+        return PrivacySanitizer.sanitize(message.trim());
     }
 
     private static String maskToken(String token) {

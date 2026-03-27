@@ -10,6 +10,7 @@ import com.smoke.client.module.Module;
 import com.smoke.client.module.ModuleManager;
 import com.smoke.client.setting.KeyBindSetting;
 import com.smoke.client.setting.Setting;
+import com.smoke.client.util.PrivacySanitizer;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -133,7 +134,7 @@ public final class ConfigService {
             JsonElement parsed = JsonParser.parseReader(reader);
             return parsed != null && parsed.isJsonObject() ? parsed.getAsJsonObject() : new JsonObject();
         } catch (Exception exception) {
-            SmokeClient.LOGGER.warn("Failed to read config file {}: {}", file, exception.getMessage());
+            SmokeClient.LOGGER.warn("Failed to read config {}: {}", describeFile(file), PrivacySanitizer.sanitizeThrowableMessage(exception));
             return new JsonObject();
         }
     }
@@ -158,8 +159,19 @@ public final class ConfigService {
                 Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException exception) {
-            throw new RuntimeException("Failed to save config " + file, exception);
+            throw new RuntimeException("Failed to save config " + describeFile(file) + ": " + PrivacySanitizer.sanitizeThrowableMessage(exception));
         }
+    }
+
+    private String describeFile(Path file) {
+        if (file == null) {
+            return "<config>";
+        }
+        if (file.startsWith(baseDir)) {
+            return baseDir.relativize(file).toString().replace('\\', '/');
+        }
+        Path fileName = file.getFileName();
+        return fileName == null ? "<config>" : fileName.toString();
     }
 
     private static JsonObject getObject(JsonObject root, String key) {
